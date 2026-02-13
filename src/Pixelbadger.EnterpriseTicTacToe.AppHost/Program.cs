@@ -1,3 +1,8 @@
+if (string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("ASPIRE_CONTAINER_RUNTIME")))
+{
+    Environment.SetEnvironmentVariable("ASPIRE_CONTAINER_RUNTIME", "podman");
+}
+
 var builder = DistributedApplication.CreateBuilder(args);
 
 var sqlServer = builder.AddSqlServer("sql");

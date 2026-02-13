@@ -54,6 +54,8 @@ Vite proxies `/api` and `/hubs` to Aspire-provided API endpoint environment vari
 dotnet run --project src/Pixelbadger.EnterpriseTicTacToe.AppHost
 ```
 
+The AppHost defaults `ASPIRE_CONTAINER_RUNTIME` to `podman` during startup and the HTTPS launch profile sets it explicitly as well.
+
 ### Frontend Production Build Output
 
 Frontend production assets are emitted to `src/Pixelbadger.EnterpriseTicTacToe.Host/wwwroot` so the Host project can serve the SPA directly.
