@@ -24,9 +24,9 @@ public sealed class GetGameStateQueryValidator : AbstractValidator<GetGameStateQ
 }
 
 public sealed class GetGameStateQueryHandler(
-    GameSessionRepository gameSessionRepository,
-    ClientIdentityHasher clientIdentityHasher,
-    Clock clock)
+    IGameSessionRepository gameSessionRepository,
+    IClientIdentityHasher clientIdentityHasher,
+    IClock clock)
     : IQueryHandler<GetGameStateQuery, GameStateDto>
 {
     public async ValueTask<GameStateDto> Handle(GetGameStateQuery query, CancellationToken cancellationToken)

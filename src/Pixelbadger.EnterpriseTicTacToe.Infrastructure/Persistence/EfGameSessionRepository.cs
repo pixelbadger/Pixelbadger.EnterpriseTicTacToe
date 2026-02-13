@@ -5,7 +5,7 @@ using Pixelbadger.EnterpriseTicTacToe.Infrastructure.Data;
 
 namespace Pixelbadger.EnterpriseTicTacToe.Infrastructure.Persistence;
 
-internal sealed class EfGameSessionRepository(TicTacToeDbContext dbContext) : GameSessionRepository
+internal sealed class EfGameSessionRepository(TicTacToeDbContext dbContext) : IGameSessionRepository
 {
     public async Task<GameSession?> GetByCode(string sessionCode, CancellationToken cancellationToken)
     {

@@ -2,7 +2,7 @@ using Pixelbadger.EnterpriseTicTacToe.Domain.Entities;
 
 namespace Pixelbadger.EnterpriseTicTacToe.Domain.Services;
 
-public interface GameSessionRepository
+public interface IGameSessionRepository
 {
     Task<GameSession?> GetByCode(string sessionCode, CancellationToken cancellationToken);
 

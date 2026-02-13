@@ -1,6 +1,6 @@
 namespace Pixelbadger.EnterpriseTicTacToe.Domain.Services;
 
-public interface SessionCodeGenerator
+public interface ISessionCodeGenerator
 {
     string GenerateCode();
 }

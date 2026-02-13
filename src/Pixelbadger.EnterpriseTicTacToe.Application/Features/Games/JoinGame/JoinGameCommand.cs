@@ -32,9 +32,9 @@ public sealed class JoinGameCommandValidator : AbstractValidator<JoinGameCommand
 }
 
 public sealed class JoinGameCommandHandler(
-    GameSessionRepository gameSessionRepository,
-    ClientIdentityHasher clientIdentityHasher,
-    Clock clock,
+    IGameSessionRepository gameSessionRepository,
+    IClientIdentityHasher clientIdentityHasher,
+    IClock clock,
     IOptions<GameSessionSettings> settings)
     : ICommandHandler<JoinGameCommand, GameStateDto>
 {

@@ -27,9 +27,9 @@ public sealed class SetPresenceCommandValidator : AbstractValidator<SetPresenceC
 }
 
 public sealed class SetPresenceCommandHandler(
-    GameSessionRepository gameSessionRepository,
-    ClientIdentityHasher clientIdentityHasher,
-    Clock clock,
+    IGameSessionRepository gameSessionRepository,
+    IClientIdentityHasher clientIdentityHasher,
+    IClock clock,
     IOptions<GameSessionSettings> settings)
     : ICommandHandler<SetPresenceCommand, GameStateDto>
 {

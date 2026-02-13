@@ -28,10 +28,10 @@ public static class DependencyInjection
             });
         });
 
-        services.AddScoped<GameSessionRepository, EfGameSessionRepository>();
-        services.AddSingleton<Clock, SystemClock>();
-        services.AddSingleton<SessionCodeGenerator, RandomSessionCodeGenerator>();
-        services.AddScoped<ClientIdentityHasher, HmacClientIdentityHasher>();
+        services.AddScoped<IGameSessionRepository, EfGameSessionRepository>();
+        services.AddSingleton<IClock, SystemClock>();
+        services.AddSingleton<ISessionCodeGenerator, RandomSessionCodeGenerator>();
+        services.AddScoped<IClientIdentityHasher, HmacClientIdentityHasher>();
         services.AddHostedService<InactiveSessionCleanupService>();
 
         return services;

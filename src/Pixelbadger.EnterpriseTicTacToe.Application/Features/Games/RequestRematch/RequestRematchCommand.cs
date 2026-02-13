@@ -27,9 +27,9 @@ public sealed class RequestRematchCommandValidator : AbstractValidator<RequestRe
 }
 
 public sealed class RequestRematchCommandHandler(
-    GameSessionRepository gameSessionRepository,
-    ClientIdentityHasher clientIdentityHasher,
-    Clock clock,
+    IGameSessionRepository gameSessionRepository,
+    IClientIdentityHasher clientIdentityHasher,
+    IClock clock,
     IOptions<GameSessionSettings> settings)
     : ICommandHandler<RequestRematchCommand, GameStateDto>
 {

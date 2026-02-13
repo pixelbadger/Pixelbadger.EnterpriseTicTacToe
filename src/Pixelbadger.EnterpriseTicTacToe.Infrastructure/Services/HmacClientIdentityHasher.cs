@@ -6,7 +6,7 @@ using Pixelbadger.EnterpriseTicTacToe.Infrastructure.Configuration;
 
 namespace Pixelbadger.EnterpriseTicTacToe.Infrastructure.Services;
 
-internal sealed class HmacClientIdentityHasher(IOptions<ClientIdentityOptions> options) : ClientIdentityHasher
+internal sealed class HmacClientIdentityHasher(IOptions<ClientIdentityOptions> options) : IClientIdentityHasher
 {
     private readonly byte[] _keyBytes = Encoding.UTF8.GetBytes(options.Value.HashKey);
 

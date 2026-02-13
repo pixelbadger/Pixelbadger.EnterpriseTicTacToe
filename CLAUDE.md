@@ -35,7 +35,7 @@ Each layer project exposes a `DependencyInjection.cs` file containing `IServiceC
 - **Validation pipeline:** Implement a Mediator behaviour (`IPipelineBehavior<TRequest, TResponse>`) that dynamically resolves an `IValidator<TRequest>` from the container and runs it before the handler. If no validator is registered, the behaviour passes through silently.
 - **Endpoint structure:** One endpoint class per operation. Endpoints live in the host project (or a dedicated Endpoints project) and dispatch via Mediator.
 - **Entity configuration:** EF entity configurations live in Infrastructure alongside the DbContext, one configuration class per entity.
-- **No `I`-prefix convention enforcement** — interfaces sit next to implementations; naming should be clear from context. Follow whichever convention is already established in the codebase.
+- **Interface naming:** Prefix all interface names with `I` (for example `IGameSessionRepository`, `IClock`).
 
 ---
 

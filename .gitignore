@@ -10,6 +10,8 @@ frontend/node_modules/
 frontend/dist/
 frontend/.vite/
 *.tsbuildinfo
+src/Pixelbadger.EnterpriseTicTacToe.Host/wwwroot/*
+!src/Pixelbadger.EnterpriseTicTacToe.Host/wwwroot/.gitkeep
 
 TestResults/
 coverage/

@@ -26,10 +26,10 @@ public sealed class StartGameCommandValidator : AbstractValidator<StartGameComma
 }
 
 public sealed class StartGameCommandHandler(
-    GameSessionRepository gameSessionRepository,
-    SessionCodeGenerator sessionCodeGenerator,
-    ClientIdentityHasher clientIdentityHasher,
-    Clock clock,
+    IGameSessionRepository gameSessionRepository,
+    ISessionCodeGenerator sessionCodeGenerator,
+    IClientIdentityHasher clientIdentityHasher,
+    IClock clock,
     IOptions<GameSessionSettings> settings)
     : ICommandHandler<StartGameCommand, GameStateDto>
 {

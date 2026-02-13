@@ -1,6 +1,6 @@
 namespace Pixelbadger.EnterpriseTicTacToe.Domain.Services;
 
-public interface ClientIdentityHasher
+public interface IClientIdentityHasher
 {
     string Hash(string clientIdentity);
 }

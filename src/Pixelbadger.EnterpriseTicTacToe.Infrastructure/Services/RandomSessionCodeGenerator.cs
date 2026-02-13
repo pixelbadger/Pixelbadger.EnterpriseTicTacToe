@@ -3,7 +3,7 @@ using Pixelbadger.EnterpriseTicTacToe.Domain.Services;
 
 namespace Pixelbadger.EnterpriseTicTacToe.Infrastructure.Services;
 
-internal sealed class RandomSessionCodeGenerator : SessionCodeGenerator
+internal sealed class RandomSessionCodeGenerator : ISessionCodeGenerator
 {
     private const string Alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
 

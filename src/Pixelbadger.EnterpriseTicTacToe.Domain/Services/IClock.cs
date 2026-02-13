@@ -1,6 +1,6 @@
 namespace Pixelbadger.EnterpriseTicTacToe.Domain.Services;
 
-public interface Clock
+public interface IClock
 {
     DateTime UtcNow { get; }
 }

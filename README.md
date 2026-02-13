@@ -46,7 +46,17 @@ npm install
 npm run dev
 ```
 
-Vite proxies `/api` and `/hubs` to `http://localhost:5000`.
+Vite proxies `/api` and `/hubs` to Aspire-provided API endpoint environment variables when available, otherwise to `http://localhost:5217`.
+
+### Full Aspire (API + SQL + Vite)
+
+```bash
+dotnet run --project src/Pixelbadger.EnterpriseTicTacToe.AppHost
+```
+
+### Frontend Production Build Output
+
+Frontend production assets are emitted to `src/Pixelbadger.EnterpriseTicTacToe.Host/wwwroot` so the Host project can serve the SPA directly.
 
 ## Tests
 

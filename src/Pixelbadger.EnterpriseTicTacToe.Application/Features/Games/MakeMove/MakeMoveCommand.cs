@@ -30,9 +30,9 @@ public sealed class MakeMoveCommandValidator : AbstractValidator<MakeMoveCommand
 }
 
 public sealed class MakeMoveCommandHandler(
-    GameSessionRepository gameSessionRepository,
-    ClientIdentityHasher clientIdentityHasher,
-    Clock clock,
+    IGameSessionRepository gameSessionRepository,
+    IClientIdentityHasher clientIdentityHasher,
+    IClock clock,
     IOptions<GameSessionSettings> settings)
     : ICommandHandler<MakeMoveCommand, GameStateDto>
 {

@@ -100,7 +100,7 @@ public sealed class GameCommandTests
             joinHandler.Handle(new JoinGameCommand("ABC123", "OtherName", "cookie-1"), CancellationToken.None).AsTask());
     }
 
-    private sealed class InMemoryRepository : GameSessionRepository
+    private sealed class InMemoryRepository : IGameSessionRepository
     {
         public Dictionary<string, GameSession> Sessions { get; } = [];
 
@@ -122,17 +122,17 @@ public sealed class GameCommandTests
         }
     }
 
-    private sealed class StubCodeGenerator(string code) : SessionCodeGenerator
+    private sealed class StubCodeGenerator(string code) : ISessionCodeGenerator
     {
         public string GenerateCode() => code;
     }
 
-    private sealed class StubHasher : ClientIdentityHasher
+    private sealed class StubHasher : IClientIdentityHasher
     {
         public string Hash(string clientIdentity) => $"hash::{clientIdentity}";
     }
 
-    private sealed class StubClock : Clock
+    private sealed class StubClock : IClock
     {
         public DateTime UtcNow => new(2026, 2, 12, 0, 0, 0, DateTimeKind.Utc);
     }
