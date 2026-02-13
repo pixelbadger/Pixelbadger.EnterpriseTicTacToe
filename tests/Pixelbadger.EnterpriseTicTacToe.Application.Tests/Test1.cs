@@ -17,8 +17,10 @@ public sealed class GameCommandTests
     public async Task StartGame_CreatesSessionWithNormalizedIdentity()
     {
         var repository = new InMemoryRepository();
+        var unitOfWork = new InMemoryUnitOfWork();
         var handler = new StartGameCommandHandler(
             repository,
+            unitOfWork,
             new StubCodeGenerator("ABC123"),
             new StubHasher(),
             new StubClock(),
@@ -36,14 +38,17 @@ public sealed class GameCommandTests
     public async Task JoinGame_WithDifferentIdentityOnExistingUsername_ThrowsForbidden()
     {
         var repository = new InMemoryRepository();
+        var unitOfWork = new InMemoryUnitOfWork();
         var startHandler = new StartGameCommandHandler(
             repository,
+            unitOfWork,
             new StubCodeGenerator("ABC123"),
             new StubHasher(),
             new StubClock(),
             Options.Create(new GameSessionSettings { InactivityTimeoutHours = 24 }));
         var joinHandler = new JoinGameCommandHandler(
             repository,
+            unitOfWork,
             new StubHasher(),
             new StubClock(),
             Options.Create(new GameSessionSettings { InactivityTimeoutHours = 24 }));
@@ -58,14 +63,17 @@ public sealed class GameCommandTests
     public async Task JoinGame_WithAvailableSeat_AddsOpponent()
     {
         var repository = new InMemoryRepository();
+        var unitOfWork = new InMemoryUnitOfWork();
         var startHandler = new StartGameCommandHandler(
             repository,
+            unitOfWork,
             new StubCodeGenerator("ABC123"),
             new StubHasher(),
             new StubClock(),
             Options.Create(new GameSessionSettings { InactivityTimeoutHours = 24 }));
         var joinHandler = new JoinGameCommandHandler(
             repository,
+            unitOfWork,
             new StubHasher(),
             new StubClock(),
             Options.Create(new GameSessionSettings { InactivityTimeoutHours = 24 }));
@@ -82,14 +90,17 @@ public sealed class GameCommandTests
     public async Task JoinGame_WithSameIdentityAndDifferentUsername_ThrowsForbidden()
     {
         var repository = new InMemoryRepository();
+        var unitOfWork = new InMemoryUnitOfWork();
         var startHandler = new StartGameCommandHandler(
             repository,
+            unitOfWork,
             new StubCodeGenerator("ABC123"),
             new StubHasher(),
             new StubClock(),
             Options.Create(new GameSessionSettings { InactivityTimeoutHours = 24 }));
         var joinHandler = new JoinGameCommandHandler(
             repository,
+            unitOfWork,
             new StubHasher(),
             new StubClock(),
             Options.Create(new GameSessionSettings { InactivityTimeoutHours = 24 }));
@@ -115,8 +126,11 @@ public sealed class GameCommandTests
             Sessions[session.SessionCode] = session;
             return Task.CompletedTask;
         }
+    }
 
-        public Task SaveChanges(CancellationToken cancellationToken)
+    private sealed class InMemoryUnitOfWork : IUnitOfWork
+    {
+        public Task SaveChangesAsync(CancellationToken cancellationToken)
         {
             return Task.CompletedTask;
         }

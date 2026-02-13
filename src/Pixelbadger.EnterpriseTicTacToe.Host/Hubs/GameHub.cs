@@ -1,5 +1,8 @@
 using Mediator;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.SignalR;
+using Pixelbadger.EnterpriseTicTacToe.Application.Contracts;
+using AppException = Pixelbadger.EnterpriseTicTacToe.Application.Exceptions.ApplicationException;
 using Pixelbadger.EnterpriseTicTacToe.Application.Features.Games.GetGameState;
 using Pixelbadger.EnterpriseTicTacToe.Application.Features.Games.SetPresence;
 using Pixelbadger.EnterpriseTicTacToe.Host.Middleware;
@@ -11,8 +14,9 @@ public sealed class GameHub(
     GameConnectionRegistry connectionRegistry,
     ILogger<GameHub> logger) : Hub
 {
-    public async Task JoinSession(string sessionCode, CancellationToken cancellationToken)
+    public async Task JoinSession(string sessionCode)
     {
+        var cancellationToken = Context.ConnectionAborted;
         var httpContext = Context.GetHttpContext()
             ?? throw new HubException("Unable to access HTTP context for hub connection.");
 
@@ -22,8 +26,9 @@ public sealed class GameHub(
         await Groups.AddToGroupAsync(Context.ConnectionId, normalizedCode, cancellationToken);
         connectionRegistry.Track(Context.ConnectionId, normalizedCode);
 
-        var gameState = await mediator.Send(new SetPresenceCommand(normalizedCode, true, clientIdentity), cancellationToken);
-        await Clients.Group(normalizedCode).SendAsync(RealtimeEvents.GameStateUpdated, gameState, cancellationToken);
+        var gameState = await SetPresenceWithConcurrencyFallback(normalizedCode, true, clientIdentity, cancellationToken);
+        await Clients.Caller.SendAsync(RealtimeEvents.GameStateUpdated, gameState, cancellationToken);
+        await Clients.OthersInGroup(normalizedCode).SendAsync(RealtimeEvents.GameStateChanged, cancellationToken);
     }
 
     public override async Task OnDisconnectedAsync(Exception? exception)
@@ -36,8 +41,8 @@ public sealed class GameHub(
                 if (httpContext is not null)
                 {
                     var clientIdentity = httpContext.GetRequiredClientIdentity();
-                    var gameState = await mediator.Send(new SetPresenceCommand(sessionCode, false, clientIdentity), CancellationToken.None);
-                    await Clients.Group(sessionCode).SendAsync(RealtimeEvents.GameStateUpdated, gameState, CancellationToken.None);
+                    await SetPresenceWithConcurrencyFallback(sessionCode, false, clientIdentity, CancellationToken.None);
+                    await Clients.Group(sessionCode).SendAsync(RealtimeEvents.GameStateChanged, CancellationToken.None);
                 }
             }
             catch (Exception ex)
@@ -49,8 +54,9 @@ public sealed class GameHub(
         await base.OnDisconnectedAsync(exception);
     }
 
-    public async Task RefreshState(string sessionCode, CancellationToken cancellationToken)
+    public async Task RefreshState(string sessionCode)
     {
+        var cancellationToken = Context.ConnectionAborted;
         var httpContext = Context.GetHttpContext()
             ?? throw new HubException("Unable to access HTTP context for hub connection.");
 
@@ -58,5 +64,35 @@ public sealed class GameHub(
         var normalizedCode = sessionCode.Trim().ToUpperInvariant();
         var gameState = await mediator.Send(new GetGameStateQuery(normalizedCode, clientIdentity), cancellationToken);
         await Clients.Caller.SendAsync(RealtimeEvents.GameStateUpdated, gameState, cancellationToken);
+    }
+
+    private async Task<GameStateDto> SetPresenceWithConcurrencyFallback(
+        string sessionCode,
+        bool isOnline,
+        string clientIdentity,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await mediator.Send(new SetPresenceCommand(sessionCode, isOnline, clientIdentity), cancellationToken);
+        }
+        catch (DbUpdateConcurrencyException exception)
+        {
+            logger.LogDebug(exception, "Presence update conflict for session {SessionCode}", sessionCode);
+            try
+            {
+                return await mediator.Send(new GetGameStateQuery(sessionCode, clientIdentity), cancellationToken);
+            }
+            catch (AppException appException)
+            {
+                logger.LogInformation(appException, "Presence refresh failed after concurrency conflict for session {SessionCode}", sessionCode);
+                throw new HubException(appException.Message);
+            }
+        }
+        catch (AppException exception)
+        {
+            logger.LogInformation(exception, "Presence update rejected for session {SessionCode}", sessionCode);
+            throw new HubException(exception.Message);
+        }
     }
 }

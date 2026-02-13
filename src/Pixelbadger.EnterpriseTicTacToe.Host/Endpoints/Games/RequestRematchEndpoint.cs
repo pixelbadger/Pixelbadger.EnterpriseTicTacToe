@@ -25,7 +25,7 @@ public sealed class RequestRematchEndpoint(
         var gameState = await mediator.Send(new RequestRematchCommand(sessionCode, clientIdentity), cancellationToken);
 
         await hubContext.Clients.Group(gameState.SessionCode)
-            .SendAsync(RealtimeEvents.GameStateUpdated, gameState, cancellationToken);
+            .SendAsync(RealtimeEvents.GameStateChanged, cancellationToken);
 
         await Send.OkAsync(gameState, cancellationToken);
     }

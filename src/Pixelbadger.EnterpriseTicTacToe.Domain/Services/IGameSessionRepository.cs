@@ -7,6 +7,4 @@ public interface IGameSessionRepository
     Task<GameSession?> GetByCode(string sessionCode, CancellationToken cancellationToken);
 
     Task Add(GameSession session, CancellationToken cancellationToken);
-
-    Task SaveChanges(CancellationToken cancellationToken);
 }

@@ -33,6 +33,7 @@ public sealed class JoinGameCommandValidator : AbstractValidator<JoinGameCommand
 
 public sealed class JoinGameCommandHandler(
     IGameSessionRepository gameSessionRepository,
+    IUnitOfWork unitOfWork,
     IClientIdentityHasher clientIdentityHasher,
     IClock clock,
     IOptions<GameSessionSettings> settings)
@@ -48,7 +49,7 @@ public sealed class JoinGameCommandHandler(
         if (session.IsExpired(now))
         {
             session.MarkExpired(now);
-            await gameSessionRepository.SaveChanges(cancellationToken);
+            await unitOfWork.SaveChangesAsync(cancellationToken);
             throw new NotFoundException("Game session has expired.");
         }
 
@@ -68,7 +69,7 @@ public sealed class JoinGameCommandHandler(
             }
 
             session.SetPresence(identityHash, isOnline: true, now, expiresAt);
-            await gameSessionRepository.SaveChanges(cancellationToken);
+            await unitOfWork.SaveChangesAsync(cancellationToken);
             return GameStateMapper.ToDto(session, identityHash);
         }
 
@@ -80,7 +81,7 @@ public sealed class JoinGameCommandHandler(
             }
 
             session.SetPresence(identityHash, isOnline: true, now, expiresAt);
-            await gameSessionRepository.SaveChanges(cancellationToken);
+            await unitOfWork.SaveChangesAsync(cancellationToken);
             return GameStateMapper.ToDto(session, identityHash);
         }
 
@@ -98,7 +99,7 @@ public sealed class JoinGameCommandHandler(
             throw new ConflictException(exception.Message);
         }
 
-        await gameSessionRepository.SaveChanges(cancellationToken);
+        await unitOfWork.SaveChangesAsync(cancellationToken);
         return GameStateMapper.ToDto(session, identityHash);
     }
 }

@@ -28,6 +28,11 @@ export function useGameRealtime({ sessionCode, onGameState }: Options) {
 
     connectionRef.current = connection;
     connection.on("GameStateUpdated", (state: GameState) => onGameStateRef.current(state));
+    connection.on("GameStateChanged", () => {
+      void connection.invoke("RefreshState", sessionCode).catch((error) => {
+        console.error("SignalR refresh failed", error);
+      });
+    });
 
     void connection
       .start()

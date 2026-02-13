@@ -1,6 +1,7 @@
 using FastEndpoints;
 using FastEndpoints.Swagger;
 using FluentValidation;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Diagnostics;
 using Pixelbadger.EnterpriseTicTacToe.Application;
 using Pixelbadger.EnterpriseTicTacToe.Infrastructure;
@@ -26,7 +27,10 @@ builder.Services.SwaggerDocument(document =>
         settings.Version = "v1";
     };
 });
-builder.Services.AddSignalR();
+builder.Services.AddSignalR(options =>
+{
+    options.EnableDetailedErrors = builder.Environment.IsDevelopment();
+});
 builder.Services.AddSingleton<GameConnectionRegistry>();
 builder.Services.AddHealthChecks()
     .AddCheck<Pixelbadger.EnterpriseTicTacToe.Host.SqlServerHealthCheck>("sqlserver");
@@ -52,6 +56,10 @@ app.UseExceptionHandler(errorApp =>
                 applicationException.StatusCode,
                 applicationException.Message,
                 new Dictionary<string, string[]>()),
+            DbUpdateConcurrencyException => (
+                StatusCodes.Status409Conflict,
+                "Game state changed. Please retry.",
+                new Dictionary<string, string[]>()),
             _ => (
                 StatusCodes.Status500InternalServerError,
                 "An unexpected error occurred.",
@@ -72,7 +80,10 @@ app.UseExceptionHandler(errorApp =>
     });
 });
 
-app.UseHttpsRedirection();
+if (!app.Environment.IsDevelopment())
+{
+    app.UseHttpsRedirection();
+}
 app.UseMiddleware<ClientIdentityCookieMiddleware>();
 app.UseFastEndpoints();
 app.MapHub<GameHub>("/hubs/game");
