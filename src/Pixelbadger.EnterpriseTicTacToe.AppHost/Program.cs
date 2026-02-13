@@ -32,8 +32,6 @@ var api = builder.AddProject(
 
 if (builder.ExecutionContext.IsPublishMode)
 {
-    api.WithEnvironment("AZURE_TOKEN_CREDENTIALS", "prod");
-
     builder.AddAzureAppServiceEnvironment("app-service-env")
         .ConfigureInfrastructure(infra =>
         {
@@ -49,6 +47,15 @@ if (builder.ExecutionContext.IsPublishMode)
     api.PublishAsAzureAppServiceWebsite((_, website) =>
     {
         website.SiteConfig.NumberOfWorkers = 1;
+
+        var tokenCredentialsSetting = website.SiteConfig.AppSettings
+            .FirstOrDefault(setting =>
+                string.Equals(setting.Value?.Name?.Value, "AZURE_TOKEN_CREDENTIALS", StringComparison.Ordinal));
+
+        if (tokenCredentialsSetting?.Value is not null)
+        {
+            tokenCredentialsSetting.Value.Value = "prod";
+        }
     });
 }
 else
