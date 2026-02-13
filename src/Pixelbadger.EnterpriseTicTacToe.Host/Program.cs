@@ -18,7 +18,11 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddApplicationServices();
 builder.Services.AddInfrastructureServices(builder.Configuration);
-builder.Services.AddMediator(options => options.Assemblies = [typeof(Pixelbadger.EnterpriseTicTacToe.Application.DependencyInjection).Assembly]);
+builder.Services.AddMediator(options =>
+{
+    options.Assemblies = [typeof(Pixelbadger.EnterpriseTicTacToe.Application.DependencyInjection).Assembly];
+    options.ServiceLifetime = ServiceLifetime.Scoped;
+});
 builder.Services.AddFastEndpoints();
 builder.Services.SwaggerDocument(document =>
 {

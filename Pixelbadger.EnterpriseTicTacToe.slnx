@@ -2,6 +2,7 @@
   <Folder Name="/src/">
     <Project Path="src/Pixelbadger.EnterpriseTicTacToe.AppHost/Pixelbadger.EnterpriseTicTacToe.AppHost.csproj" />
     <Project Path="src/Pixelbadger.EnterpriseTicTacToe.Application/Pixelbadger.EnterpriseTicTacToe.Application.csproj" />
+    <Project Path="src/Pixelbadger.EnterpriseTicTacToe.Database/Pixelbadger.EnterpriseTicTacToe.Database.csproj" />
     <Project Path="src/Pixelbadger.EnterpriseTicTacToe.Domain/Pixelbadger.EnterpriseTicTacToe.Domain.csproj" />
     <Project Path="src/Pixelbadger.EnterpriseTicTacToe.Host/Pixelbadger.EnterpriseTicTacToe.Host.csproj" />
     <Project Path="src/Pixelbadger.EnterpriseTicTacToe.Infrastructure/Pixelbadger.EnterpriseTicTacToe.Infrastructure.csproj" />
