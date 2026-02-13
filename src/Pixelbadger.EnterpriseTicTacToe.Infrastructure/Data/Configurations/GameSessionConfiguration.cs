@@ -13,6 +13,9 @@ public sealed class GameSessionConfiguration : IEntityTypeConfiguration<GameSess
 
         builder.HasKey(session => session.Id);
 
+        builder.Property(session => session.Id)
+            .ValueGeneratedNever();
+
         builder.Property(session => session.SessionCode)
             .HasMaxLength(6)
             .IsRequired();

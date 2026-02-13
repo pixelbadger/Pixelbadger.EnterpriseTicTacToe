@@ -17,7 +17,7 @@ internal sealed class ClientIdentityCookieMiddleware(RequestDelegate next, IHost
             context.Response.Cookies.Append(CookieName, clientIdentity, new CookieOptions
             {
                 HttpOnly = true,
-                Secure = !environment.IsDevelopment() || context.Request.IsHttps,
+                Secure = !environment.IsDevelopment(),
                 SameSite = SameSiteMode.Lax,
                 IsEssential = true,
                 Path = "/",

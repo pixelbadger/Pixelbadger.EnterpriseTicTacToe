@@ -30,7 +30,7 @@ public sealed class MakeMoveEndpoint(
         var gameState = await mediator.Send(new MakeMoveCommand(sessionCode, request.CellIndex, clientIdentity), cancellationToken);
 
         await hubContext.Clients.Group(gameState.SessionCode)
-            .SendAsync(RealtimeEvents.GameStateUpdated, gameState, cancellationToken);
+            .SendAsync(RealtimeEvents.GameStateChanged, cancellationToken);
 
         await Send.OkAsync(gameState, cancellationToken);
     }

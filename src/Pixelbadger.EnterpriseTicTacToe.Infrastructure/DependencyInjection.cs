@@ -29,6 +29,7 @@ public static class DependencyInjection
         });
 
         services.AddScoped<IGameSessionRepository, EfGameSessionRepository>();
+        services.AddScoped<IUnitOfWork, EfUnitOfWork>();
         services.AddSingleton<IClock, SystemClock>();
         services.AddSingleton<ISessionCodeGenerator, RandomSessionCodeGenerator>();
         services.AddScoped<IClientIdentityHasher, HmacClientIdentityHasher>();

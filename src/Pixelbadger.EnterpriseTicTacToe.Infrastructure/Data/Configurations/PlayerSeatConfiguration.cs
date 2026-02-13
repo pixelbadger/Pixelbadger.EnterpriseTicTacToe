@@ -12,6 +12,9 @@ public sealed class PlayerSeatConfiguration : IEntityTypeConfiguration<PlayerSea
 
         builder.HasKey(player => player.Id);
 
+        builder.Property(player => player.Id)
+            .ValueGeneratedNever();
+
         builder.Property(player => player.Username)
             .HasMaxLength(80)
             .IsRequired();

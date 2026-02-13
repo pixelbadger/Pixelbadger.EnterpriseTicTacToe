@@ -18,9 +18,4 @@ internal sealed class EfGameSessionRepository(TicTacToeDbContext dbContext) : IG
     {
         return dbContext.GameSessions.AddAsync(session, cancellationToken).AsTask();
     }
-
-    public Task SaveChanges(CancellationToken cancellationToken)
-    {
-        return dbContext.SaveChangesAsync(cancellationToken);
-    }
 }

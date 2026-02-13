@@ -27,6 +27,7 @@ public sealed class StartGameCommandValidator : AbstractValidator<StartGameComma
 
 public sealed class StartGameCommandHandler(
     IGameSessionRepository gameSessionRepository,
+    IUnitOfWork unitOfWork,
     ISessionCodeGenerator sessionCodeGenerator,
     IClientIdentityHasher clientIdentityHasher,
     IClock clock,
@@ -64,7 +65,7 @@ public sealed class StartGameCommandHandler(
             expiresAtUtc: expiresAt);
 
         await gameSessionRepository.Add(session, cancellationToken);
-        await gameSessionRepository.SaveChanges(cancellationToken);
+        await unitOfWork.SaveChangesAsync(cancellationToken);
 
         return GameStateMapper.ToDto(session, identityHash);
     }
