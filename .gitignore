@@ -17,3 +17,5 @@ TestResults/
 coverage/
 
 .DS_Store
+
+aspire-output/
