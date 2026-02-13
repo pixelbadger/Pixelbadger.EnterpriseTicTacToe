@@ -1,0 +1,45 @@
+@import url("https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg: 220 35% 7%;
+  --card: 215 44% 13%;
+  --ring: 184 95% 65%;
+  --accent: 184 95% 65%;
+  --primary: 198 89% 59%;
+  --muted: 217 19% 29%;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  min-height: 100%;
+  font-family: "Instrument Sans", sans-serif;
+  color: #f8fafc;
+}
+
+body {
+  background:
+    radial-gradient(1000px 600px at 10% 20%, rgba(37, 99, 235, 0.25), transparent 55%),
+    radial-gradient(1000px 600px at 85% 80%, rgba(20, 184, 166, 0.2), transparent 55%),
+    #080b12;
+}
+
+.bg-grid {
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+  background-size: 36px 36px;
+}
+
+.page-shell {
+  min-height: 100vh;
+}
