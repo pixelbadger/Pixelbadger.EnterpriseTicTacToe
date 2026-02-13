@@ -9,6 +9,7 @@ Anonymous, cookie-bound, multiplayer tic-tac-toe with a React SPA frontend and .
 - `src/Pixelbadger.EnterpriseTicTacToe.Infrastructure` - EF Core SQL Server persistence and service implementations.
 - `src/Pixelbadger.EnterpriseTicTacToe.Host` - FastEndpoints API, SignalR hub, cookie identity middleware.
 - `src/Pixelbadger.EnterpriseTicTacToe.AppHost` - .NET Aspire orchestration.
+- `src/Pixelbadger.EnterpriseTicTacToe.Database` - DbUp migration runner and SQL schema scripts used for deployment.
 - `frontend` - React/Vite SPA with RTK Query and SignalR client.
 
 ## Feature Highlights
@@ -29,7 +30,13 @@ Anonymous, cookie-bound, multiplayer tic-tac-toe with a React SPA frontend and .
 
 1. Set SQL Server connection string in `src/Pixelbadger.EnterpriseTicTacToe.Host/appsettings.Development.json`.
 2. Set `ClientIdentity:HashKey` from a secure local secret source.
-3. Run:
+3. Apply database schema scripts:
+
+```bash
+dotnet run --project src/Pixelbadger.EnterpriseTicTacToe.Database -- --connection-string "<your-connection-string>"
+```
+
+4. Run:
 
 ```bash
 dotnet run --project src/Pixelbadger.EnterpriseTicTacToe.Host
