@@ -9,6 +9,7 @@ obj/
 frontend/node_modules/
 frontend/dist/
 frontend/.vite/
+*.tsbuildinfo
 
 TestResults/
 coverage/
