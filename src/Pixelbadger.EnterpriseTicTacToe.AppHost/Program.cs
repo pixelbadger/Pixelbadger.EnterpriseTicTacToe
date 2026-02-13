@@ -5,16 +5,10 @@ if (string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("ASPIRE_CONTAIN
 
 var builder = DistributedApplication.CreateBuilder(args);
 
-var sqlServer = builder.AddSqlServer("sql");
-
-var ticTacToeDb = sqlServer.AddDatabase("tic-tac-toe-db", "EnterpriseTicTacToe");
-
 var api = builder.AddProject(
         name: "api",
         projectPath: "../Pixelbadger.EnterpriseTicTacToe.Host/Pixelbadger.EnterpriseTicTacToe.Host.csproj")
-    .WithReference(ticTacToeDb)
-    .WithExternalHttpEndpoints()
-    .WaitFor(ticTacToeDb);
+    .WithExternalHttpEndpoints();
 
 builder.AddViteApp("frontend", "../../frontend")
     .WithReference(api)

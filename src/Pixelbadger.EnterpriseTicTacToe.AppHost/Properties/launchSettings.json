@@ -9,7 +9,7 @@
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development",
         "DOTNET_ENVIRONMENT": "Development",
-        "ASPIRE_CONTAINER_RUNTIME": "podman",
+        "ASPIRE_CONTAINER_RUNTIME": "docker",
         "ASPIRE_DASHBOARD_OTLP_ENDPOINT_URL": "https://localhost:21030",
         "ASPIRE_RESOURCE_SERVICE_ENDPOINT_URL": "https://localhost:22057"
       }

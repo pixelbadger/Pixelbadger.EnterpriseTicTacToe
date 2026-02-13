@@ -1,18 +1,12 @@
 using FastEndpoints;
 using FastEndpoints.Swagger;
 using FluentValidation;
-using Mediator;
 using Microsoft.AspNetCore.Diagnostics;
-using Microsoft.Extensions.Diagnostics.HealthChecks;
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.DependencyInjection;
 using Pixelbadger.EnterpriseTicTacToe.Application;
-using Pixelbadger.EnterpriseTicTacToe.Application.Exceptions;
 using Pixelbadger.EnterpriseTicTacToe.Infrastructure;
-using Pixelbadger.EnterpriseTicTacToe.Infrastructure.Data;
 using Pixelbadger.EnterpriseTicTacToe.Host.Hubs;
 using Pixelbadger.EnterpriseTicTacToe.Host.Middleware;
+using Microsoft.AspNetCore.Mvc;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -95,12 +89,6 @@ if (Directory.Exists(webRoot))
     app.UseDefaultFiles();
     app.UseStaticFiles();
     app.MapFallbackToFile("index.html");
-}
-
-await using (var scope = app.Services.CreateAsyncScope())
-{
-    var dbContext = scope.ServiceProvider.GetRequiredService<TicTacToeDbContext>();
-    await dbContext.Database.EnsureCreatedAsync();
 }
 
 app.Run();
