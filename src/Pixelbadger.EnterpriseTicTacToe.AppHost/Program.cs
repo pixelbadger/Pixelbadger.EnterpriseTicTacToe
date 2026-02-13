@@ -32,6 +32,8 @@ var api = builder.AddProject(
 
 if (builder.ExecutionContext.IsPublishMode)
 {
+    api.WithEnvironment("AZURE_TOKEN_CREDENTIALS", "prod");
+
     builder.AddAzureAppServiceEnvironment("app-service-env")
         .ConfigureInfrastructure(infra =>
         {
