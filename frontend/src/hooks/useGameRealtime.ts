@@ -9,6 +9,11 @@ type Options = {
 
 export function useGameRealtime({ sessionCode, onGameState }: Options) {
   const connectionRef = useRef<HubConnection | null>(null);
+  const onGameStateRef = useRef(onGameState);
+
+  useEffect(() => {
+    onGameStateRef.current = onGameState;
+  }, [onGameState]);
 
   useEffect(() => {
     if (!sessionCode) {
@@ -22,7 +27,7 @@ export function useGameRealtime({ sessionCode, onGameState }: Options) {
       .build();
 
     connectionRef.current = connection;
-    connection.on("GameStateUpdated", (state: GameState) => onGameState(state));
+    connection.on("GameStateUpdated", (state: GameState) => onGameStateRef.current(state));
 
     void connection
       .start()
@@ -38,5 +43,5 @@ export function useGameRealtime({ sessionCode, onGameState }: Options) {
       connectionRef.current = null;
       void connection.stop();
     };
-  }, [onGameState, sessionCode]);
+  }, [sessionCode]);
 }
