@@ -61,7 +61,9 @@ Vite proxies `/api` and `/hubs` to Aspire-provided API endpoint environment vari
 dotnet run --project src/Pixelbadger.EnterpriseTicTacToe.AppHost
 ```
 
-The AppHost defaults `ASPIRE_CONTAINER_RUNTIME` to `podman` during startup and the HTTPS launch profile sets it explicitly as well.
+The AppHost orchestrates SQL Server and overrides `ConnectionStrings:DefaultConnection` for both the API and the DbUp runner to use the Aspire SQL instance.
+Use the `dbup` resource from the Aspire dashboard when you want to run schema scripts against the orchestrated database.
+Aspire defaults to Docker; set `ASPIRE_CONTAINER_RUNTIME=podman` in your local environment if you want to run containers with Podman.
 
 ### Frontend Production Build Output
 
