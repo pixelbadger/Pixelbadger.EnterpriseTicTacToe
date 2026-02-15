@@ -3,6 +3,7 @@ name: CI
 on:
   push:
     branches: [main, develop]
+  workflow_dispatch:
 
 jobs:
   ci:
@@ -134,7 +135,7 @@ jobs:
           echo "Deploy principal object id: $principalObjectId"
 
           resourceGroupScope="/subscriptions/$AZURE_SUBSCRIPTION_ID/resourceGroups/$AZURE_RESOURCE_GROUP"
-          roleNames="$(az role assignment list --assignee-object-id "$principalObjectId" --scope "$resourceGroupScope" --include-inherited --all --query "[].roleDefinitionName" -o tsv)"
+          roleNames="$(az role assignment list --assignee-object-id "$principalObjectId" --scope "$resourceGroupScope" --include-inherited --fill-principal-name false --query "[].roleDefinitionName" -o tsv)"
 
           hasOwner=false
           hasContributor=false
@@ -181,40 +182,33 @@ jobs:
           fi
 
       - name: Run DbUp against deployed database
-        env:
-          AZURE_SQL_MIGRATION_CONNECTION_STRING: ${{ secrets.AZURE_SQL_MIGRATION_CONNECTION_STRING }}
         run: |
           set -o pipefail
 
-          connectionString="$AZURE_SQL_MIGRATION_CONNECTION_STRING"
+          apiWebAppName="$AZURE_API_WEBAPP_NAME"
 
-          if [ -z "$connectionString" ]; then
-            apiWebAppName="$AZURE_API_WEBAPP_NAME"
+          if [ -z "$apiWebAppName" ]; then
+            mapfile -t apiWebApps < <(az webapp list --resource-group "$AZURE_RESOURCE_GROUP" --query "[?tags['aspire-resource-name']=='api'].name" -o tsv)
 
-            if [ -z "$apiWebAppName" ]; then
-              mapfile -t apiWebApps < <(az webapp list --resource-group "$AZURE_RESOURCE_GROUP" --query "[?tags['aspire-resource-name']=='api'].name" -o tsv)
-
-              if [ "${#apiWebApps[@]}" -ne 1 ]; then
-                echo "Expected exactly one deployed api web app tagged aspire-resource-name=api in resource group '$AZURE_RESOURCE_GROUP'."
-                echo "Set repository variable AZURE_API_WEBAPP_NAME to avoid resource discovery."
-                echo "Matched web apps: ${apiWebApps[*]:-<none>}"
-                exit 1
-              fi
-
-              apiWebAppName="${apiWebApps[0]}"
-            fi
-
-            if [ -z "$apiWebAppName" ]; then
-              echo "Unable to resolve deployed api web app in resource group '$AZURE_RESOURCE_GROUP'."
+            if [ "${#apiWebApps[@]}" -ne 1 ]; then
+              echo "Expected exactly one deployed api web app tagged aspire-resource-name=api in resource group '$AZURE_RESOURCE_GROUP'."
+              echo "Set repository variable AZURE_API_WEBAPP_NAME to avoid resource discovery."
+              echo "Matched web apps: ${apiWebApps[*]:-<none>}"
               exit 1
             fi
 
-            connectionString="$(az webapp config appsettings list --resource-group "$AZURE_RESOURCE_GROUP" --name "$apiWebAppName" --query "[?name=='ConnectionStrings__DefaultConnection'].value | [0]" -o tsv)"
+            apiWebAppName="${apiWebApps[0]}"
           fi
 
+          if [ -z "$apiWebAppName" ]; then
+            echo "Unable to resolve deployed api web app in resource group '$AZURE_RESOURCE_GROUP'."
+            exit 1
+          fi
+
+          connectionString="$(az webapp config appsettings list --resource-group "$AZURE_RESOURCE_GROUP" --name "$apiWebAppName" --query "[?name=='ConnectionStrings__DefaultConnection'].value | [0]" -o tsv)"
+
           if [ -z "$connectionString" ]; then
-            echo "Unable to resolve a migration connection string."
-            echo "Set secret AZURE_SQL_MIGRATION_CONNECTION_STRING, or ensure ConnectionStrings__DefaultConnection is set on the deployed api app."
+            echo "Unable to resolve ConnectionStrings__DefaultConnection from '$apiWebAppName'."
             exit 1
           fi
 
