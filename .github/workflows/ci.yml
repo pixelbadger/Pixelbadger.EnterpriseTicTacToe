@@ -134,7 +134,7 @@ jobs:
           echo "Deploy principal object id: $principalObjectId"
 
           resourceGroupScope="/subscriptions/$AZURE_SUBSCRIPTION_ID/resourceGroups/$AZURE_RESOURCE_GROUP"
-          roleNames="$(az role assignment list --assignee-object-id "$principalObjectId" --scope "$resourceGroupScope" --include-inherited --all --query "[].roleDefinitionName" -o tsv)"
+          roleNames="$(az role assignment list --assignee-object-id "$principalObjectId" --scope "$resourceGroupScope" --include-inherited --fill-principal-name false --query "[].roleDefinitionName" -o tsv)"
 
           hasOwner=false
           hasContributor=false
