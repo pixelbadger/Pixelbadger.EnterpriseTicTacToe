@@ -38,6 +38,14 @@ Each layer project exposes a `DependencyInjection.cs` file containing `IServiceC
 - **Persistence writes / unit of work:** Repositories do not expose `SaveChanges` methods. Mutations are committed through an `IUnitOfWork` abstraction (`SaveChangesAsync`) so each command handler controls a single commit point for all tracked changes.
 - **Interface naming:** Prefix all interface names with `I` (for example `IGameSessionRepository`, `IClock`).
 
+### Backend Testing Requirements
+
+- **Framework + assertions:** Backend tests use MSTest + Shouldly.
+- **SUT-aligned class naming:** Each SUT has a dedicated `[TestClass]` named `[ClassName]Tests` (for example `GameSessionTests`, `StartGameCommandHandlerTests`). Do not combine unrelated SUTs in one test class.
+- **Coverage expectations:** For each SUT, cover happy path plus key rule/guard branches (validation failures, not found/forbidden/conflict paths, and state transitions where applicable).
+- **Handler/component behavior:** Tests for command/query handlers verify both returned behavior and orchestration side effects (repository usage, unit-of-work save calls, and exception mapping).
+- **Internal components:** Testing internal classes is allowed when needed; expose internals to test assemblies with `InternalsVisibleTo` in a minimal and explicit way.
+
 ---
 
 ## Frontend — React SPA
@@ -63,6 +71,14 @@ This is a client-side single-page application. No server-side rendering.
 - **Forms** use react-hook-form with zod or yup schemas for validation where appropriate.
 - **Component structure:** Co-locate component, styles, and tests. Prefer named exports.
 - **shadcn/ui** components are copied into the project (not installed as a package). Customise via the project's tailwind theme tokens.
+
+### Frontend Testing Requirements
+
+- **Framework:** Frontend unit/component tests use Vitest.
+- **Placement + naming:** Test files should be co-located with their SUT and named `*.test.ts` or `*.test.tsx`.
+- **Coverage expectations:** Test render behavior, user interactions, state transitions, and error/edge states for pages, components, hooks, and utility modules touched by the change.
+- **Isolation:** Prefer deterministic tests with targeted mocks/stubs for network and realtime dependencies rather than live backend calls.
+- **PR gate:** `dotnet test` and frontend Vitest suites must pass in PR validation before merge.
 
 ---
 
