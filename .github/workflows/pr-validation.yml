@@ -7,10 +7,17 @@ on:
 jobs:
   validate:
     runs-on: ubuntu-latest
+    permissions:
+      checks: write
+      pull-requests: write
+      contents: read
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Create test results directories
+        run: mkdir -p test-results/backend test-results/frontend
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
@@ -29,7 +36,7 @@ jobs:
         run: dotnet build Pixelbadger.EnterpriseTicTacToe.slnx --no-restore --configuration Release
 
       - name: Test backend
-        run: dotnet test Pixelbadger.EnterpriseTicTacToe.slnx --no-build --configuration Release
+        run: dotnet test Pixelbadger.EnterpriseTicTacToe.slnx --no-build --configuration Release --logger trx --results-directory test-results/backend
 
       - name: Install frontend dependencies
         working-directory: frontend
@@ -41,4 +48,20 @@ jobs:
 
       - name: Test frontend
         working-directory: frontend
-        run: npm run test -- --run --passWithNoTests
+        run: npm run test -- --run --reporter=default --reporter=junit --outputFile=../test-results/frontend/vitest.junit.xml
+
+      - name: Publish unit test results
+        if: always()
+        uses: EnricoMi/publish-unit-test-result-action@v2
+        with:
+          files: |
+            test-results/backend/**/*.trx
+            test-results/frontend/**/*.xml
+
+      - name: Upload test result artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-pr-validation
+          path: test-results
+          if-no-files-found: warn

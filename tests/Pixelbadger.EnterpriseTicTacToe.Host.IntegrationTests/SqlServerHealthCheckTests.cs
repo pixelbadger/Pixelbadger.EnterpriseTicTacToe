@@ -6,10 +6,10 @@ using Shouldly;
 namespace Pixelbadger.EnterpriseTicTacToe.Host.IntegrationTests;
 
 [TestClass]
-public sealed class HealthCheckTests
+public sealed class SqlServerHealthCheckTests
 {
     [TestMethod]
-    public async Task SqlServerHealthCheck_ReturnsHealthyWhenDbContextCanConnect()
+    public async Task CheckHealthAsync_ReturnsHealthyWhenDbContextCanConnect()
     {
         var dbOptions = new DbContextOptionsBuilder<TicTacToeDbContext>()
             .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))
