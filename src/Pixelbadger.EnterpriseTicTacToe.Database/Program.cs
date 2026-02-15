@@ -1,28 +1,44 @@
 using System.Reflection;
 using DbUp;
+using Microsoft.Data.SqlClient;
 
-var connectionString = ResolveConnectionString(args);
-
-EnsureDatabase.For.SqlDatabase(connectionString);
-
-var upgrader = DeployChanges.To
-    .SqlDatabase(connectionString)
-    .WithScriptsEmbeddedInAssembly(
-        Assembly.GetExecutingAssembly(),
-        scriptName => scriptName.Contains(".Scripts.", StringComparison.Ordinal))
-    .WithTransactionPerScript()
-    .LogToConsole()
-    .Build();
-
-var result = upgrader.PerformUpgrade();
-if (!result.Successful)
+try
 {
-    Console.Error.WriteLine(result.Error);
+    var connectionString = ResolveConnectionString(args);
+
+    EnsureDatabase.For.SqlDatabase(connectionString);
+
+    var upgrader = DeployChanges.To
+        .SqlDatabase(connectionString)
+        .WithScriptsEmbeddedInAssembly(
+            Assembly.GetExecutingAssembly(),
+            scriptName => scriptName.Contains(".Scripts.", StringComparison.Ordinal))
+        .WithTransactionPerScript()
+        .LogToConsole()
+        .Build();
+
+    var result = upgrader.PerformUpgrade();
+    if (!result.Successful)
+    {
+        Console.Error.WriteLine(result.Error);
+        return 1;
+    }
+
+    Console.WriteLine("Database schema migrations completed successfully.");
+    return 0;
+}
+catch (SqlException exception) when (exception.Number == 18456)
+{
+    Console.Error.WriteLine("SQL authentication failed while running DbUp.");
+    Console.Error.WriteLine("If this connection uses Azure AD authentication, ensure the executing principal has database access and appropriate roles.");
+    Console.Error.WriteLine(exception.Message);
     return 1;
 }
-
-Console.WriteLine("Database schema migrations completed successfully.");
-return 0;
+catch (Exception exception)
+{
+    Console.Error.WriteLine(exception);
+    return 1;
+}
 
 static string ResolveConnectionString(string[] args)
 {

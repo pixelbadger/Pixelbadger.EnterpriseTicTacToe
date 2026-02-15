@@ -111,39 +111,128 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
+      - name: Preflight deploy principal RBAC
+        env:
+          AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "$AZURE_RESOURCE_GROUP" ]; then
+            echo "::error::AZURE_RESOURCE_GROUP is not set."
+            exit 1
+          fi
+
+          accessToken="$(az account get-access-token --resource https://management.azure.com/ --query accessToken -o tsv)"
+          principalObjectId="$(python3 -c 'import base64, json, sys; token = sys.stdin.read().strip(); parts = token.split("."); payload = parts[1] + "=" * (-len(parts[1]) % 4); print(json.loads(base64.urlsafe_b64decode(payload)).get("oid", ""))' <<< "$accessToken")"
+
+          if [ -z "$principalObjectId" ]; then
+            echo "::error::Unable to resolve principal object id from the Azure access token."
+            exit 1
+          fi
+
+          echo "Deploy principal object id: $principalObjectId"
+
+          resourceGroupScope="/subscriptions/$AZURE_SUBSCRIPTION_ID/resourceGroups/$AZURE_RESOURCE_GROUP"
+          roleNames="$(az role assignment list --assignee-object-id "$principalObjectId" --scope "$resourceGroupScope" --include-inherited --all --query "[].roleDefinitionName" -o tsv)"
+
+          hasOwner=false
+          hasContributor=false
+          hasUserAccessAdministrator=false
+
+          while IFS= read -r roleName; do
+            case "$roleName" in
+              Owner)
+                hasOwner=true
+                ;;
+              Contributor)
+                hasContributor=true
+                ;;
+              "User Access Administrator")
+                hasUserAccessAdministrator=true
+                ;;
+            esac
+          done <<< "$roleNames"
+
+          if [ "$hasOwner" = true ] || { [ "$hasContributor" = true ] && [ "$hasUserAccessAdministrator" = true ]; }; then
+            echo "Deploy principal has sufficient RBAC for resource provisioning and role assignment writes."
+            exit 0
+          fi
+
+          echo "::error::Deploy principal is missing required RBAC at or above '$resourceGroupScope'."
+          echo "::error::Grant Owner, or grant both Contributor and User Access Administrator."
+          echo "Resolved role assignments: ${roleNames:-<none>}"
+          echo "AZURE_CLIENT_ID: $AZURE_CLIENT_ID"
+          exit 1
+
       - name: Deploy AppHost
         env:
           AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
           CLIENT_IDENTITY_HASH_KEY: ${{ secrets.CLIENT_IDENTITY_HASH_KEY }}
-        run: dotnet run --project src/Pixelbadger.EnterpriseTicTacToe.AppHost -- --publisher azure --output-path aspire-output --Azure:SubscriptionId="$AZURE_SUBSCRIPTION_ID" --Azure:ResourceGroup="$AZURE_RESOURCE_GROUP" --Azure:Location="$AZURE_LOCATION" --Parameters:client-identity-hash-key="$CLIENT_IDENTITY_HASH_KEY"
+        run: |
+          set -o pipefail
+
+          deployLogPath="$(mktemp)"
+          dotnet run --project src/Pixelbadger.EnterpriseTicTacToe.AppHost -- --publisher azure --output-path aspire-output --Azure:SubscriptionId="$AZURE_SUBSCRIPTION_ID" --Azure:ResourceGroup="$AZURE_RESOURCE_GROUP" --Azure:Location="$AZURE_LOCATION" --Parameters:client-identity-hash-key="$CLIENT_IDENTITY_HASH_KEY" 2>&1 | tee "$deployLogPath"
+
+          if grep -Eq "Pipeline execution failed|Step 'provision-.*' failed|InvalidTemplateDeployment|Microsoft\.Authorization/roleAssignments/write" "$deployLogPath"; then
+            echo "::error::AppHost publish reported Azure provisioning errors. Ensure the GitHub OIDC principal has permissions to create role assignments (for example Contributor + User Access Administrator) at the deployment scope."
+            exit 1
+          fi
 
       - name: Run DbUp against deployed database
+        env:
+          AZURE_SQL_MIGRATION_CONNECTION_STRING: ${{ secrets.AZURE_SQL_MIGRATION_CONNECTION_STRING }}
         run: |
-          apiWebAppName="$AZURE_API_WEBAPP_NAME"
+          set -o pipefail
 
-          if [ -z "$apiWebAppName" ]; then
-            mapfile -t apiWebApps < <(az webapp list --resource-group "$AZURE_RESOURCE_GROUP" --query "[?tags['aspire-resource-name']=='api'].name" -o tsv)
+          connectionString="$AZURE_SQL_MIGRATION_CONNECTION_STRING"
 
-            if [ "${#apiWebApps[@]}" -ne 1 ]; then
-              echo "Expected exactly one deployed api web app tagged aspire-resource-name=api in resource group '$AZURE_RESOURCE_GROUP'."
-              echo "Set repository variable AZURE_API_WEBAPP_NAME to avoid resource discovery."
-              echo "Matched web apps: ${apiWebApps[*]:-<none>}"
+          if [ -z "$connectionString" ]; then
+            apiWebAppName="$AZURE_API_WEBAPP_NAME"
+
+            if [ -z "$apiWebAppName" ]; then
+              mapfile -t apiWebApps < <(az webapp list --resource-group "$AZURE_RESOURCE_GROUP" --query "[?tags['aspire-resource-name']=='api'].name" -o tsv)
+
+              if [ "${#apiWebApps[@]}" -ne 1 ]; then
+                echo "Expected exactly one deployed api web app tagged aspire-resource-name=api in resource group '$AZURE_RESOURCE_GROUP'."
+                echo "Set repository variable AZURE_API_WEBAPP_NAME to avoid resource discovery."
+                echo "Matched web apps: ${apiWebApps[*]:-<none>}"
+                exit 1
+              fi
+
+              apiWebAppName="${apiWebApps[0]}"
+            fi
+
+            if [ -z "$apiWebAppName" ]; then
+              echo "Unable to resolve deployed api web app in resource group '$AZURE_RESOURCE_GROUP'."
               exit 1
             fi
 
-            apiWebAppName="${apiWebApps[0]}"
+            connectionString="$(az webapp config appsettings list --resource-group "$AZURE_RESOURCE_GROUP" --name "$apiWebAppName" --query "[?name=='ConnectionStrings__DefaultConnection'].value | [0]" -o tsv)"
           fi
-
-          if [ -z "$apiWebAppName" ]; then
-            echo "Unable to resolve deployed api web app in resource group '$AZURE_RESOURCE_GROUP'."
-            exit 1
-          fi
-
-          connectionString="$(az webapp config appsettings list --resource-group "$AZURE_RESOURCE_GROUP" --name "$apiWebAppName" --query "[?name=='ConnectionStrings__DefaultConnection'].value | [0]" -o tsv)"
 
           if [ -z "$connectionString" ]; then
-            echo "Unable to resolve ConnectionStrings__DefaultConnection from '$apiWebAppName'."
+            echo "Unable to resolve a migration connection string."
+            echo "Set secret AZURE_SQL_MIGRATION_CONNECTION_STRING, or ensure ConnectionStrings__DefaultConnection is set on the deployed api app."
             exit 1
           fi
 
-          dotnet run --project src/Pixelbadger.EnterpriseTicTacToe.Database -- --connection-string "$connectionString"
+          if [[ "$connectionString" == *"Authentication=ActiveDirectoryDefault"* ]]; then
+            echo "Using ActiveDirectoryDefault authentication for DbUp."
+            echo "Ensure the GitHub OIDC principal has a SQL database user with migration permissions, or provide AZURE_SQL_MIGRATION_CONNECTION_STRING for migration-specific credentials."
+          fi
+
+          dbupLogPath="$(mktemp)"
+          set +e
+          dotnet run --project src/Pixelbadger.EnterpriseTicTacToe.Database -- --connection-string "$connectionString" 2>&1 | tee "$dbupLogPath"
+          dbupExitCode=${PIPESTATUS[0]}
+          set -e
+
+          if [ "$dbupExitCode" -ne 0 ]; then
+            if grep -q "Login failed for user '<token-identified principal>'" "$dbupLogPath"; then
+              echo "::error::DbUp could not authenticate to Azure SQL as the OIDC token principal. Provision SQL access for the principal, or set AZURE_SQL_MIGRATION_CONNECTION_STRING to SQL credentials intended for migrations."
+            fi
+
+            exit "$dbupExitCode"
+          fi
