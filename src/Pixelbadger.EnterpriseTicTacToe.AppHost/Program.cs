@@ -1,4 +1,5 @@
 using Azure.Provisioning.AppService;
+using Azure.Provisioning.Sql;
 using Aspire.Hosting.Azure;
 using Aspire.Hosting.Azure.AppService;
 
@@ -36,6 +37,12 @@ if (builder.ExecutionContext.IsPublishMode)
         .ConfigureInfrastructure(infra =>
         {
             var resources = infra.GetProvisionableResources();
+
+            foreach (var sqlDatabase in resources.OfType<SqlDatabase>())
+            {
+                sqlDatabase.FreeLimitExhaustionBehavior = FreeLimitExhaustionBehavior.BillOverUsage;
+            }
+
             var appServicePlan = resources.OfType<AppServicePlan>().Single();
             appServicePlan.Sku = new AppServiceSkuDescription
             {
