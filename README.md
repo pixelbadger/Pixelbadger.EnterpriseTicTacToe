@@ -85,8 +85,6 @@ npm test
 ## CI Deploy Prerequisites
 
 - GitHub OIDC deploy principal needs Azure RBAC at deploy scope that can create role assignments (for example `Contributor` + `User Access Administrator` on the target resource group).
-- DbUp in CI can run either:
-  - with Azure AD auth from `ConnectionStrings__DefaultConnection` (requires the OIDC principal to exist as a SQL user with migration permissions), or
-  - with a dedicated GitHub secret named `AZURE_SQL_MIGRATION_CONNECTION_STRING` containing migration credentials.
+- DbUp in CI uses Azure AD auth from `ConnectionStrings__DefaultConnection`; the OIDC principal must exist as a SQL user with migration permissions.
 - Use `scripts/sql/bootstrap-github-oidc-dbup.sql` to create the SQL user and grant migration roles (`db_ddladmin`, `db_datareader`, `db_datawriter`) for the OIDC principal.
 - Repository variable `AZURE_API_WEBAPP_NAME` is optional, but recommended to avoid web app discovery ambiguity during DbUp.
