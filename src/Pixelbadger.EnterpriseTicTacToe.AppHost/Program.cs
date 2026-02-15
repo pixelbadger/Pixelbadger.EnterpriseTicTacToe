@@ -9,7 +9,8 @@ var clientIdentityHashKey = builder.AddParameter("client-identity-hash-key", sec
 
 var sqlServer = builder.AddAzureSqlServer("sql")
     .RunAsContainer();
-var ticTacToeDb = sqlServer.AddDatabase("tictactoedb", "tictactoe");
+var ticTacToeDb = sqlServer.AddDatabase("tictactoedb", "tictactoe")
+    .WithDefaultAzureSku();
 
 if (!builder.ExecutionContext.IsPublishMode)
 {
