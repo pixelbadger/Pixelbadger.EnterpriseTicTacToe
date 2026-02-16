@@ -1,4 +1,4 @@
-using Pixelbadger.EnterpriseTicTacToe.Application.Exceptions;
+using Pixelbadger.EnterpriseTicTacToe.Application;
 using Pixelbadger.EnterpriseTicTacToe.Application.Features.Games.GetGameState;
 using Pixelbadger.EnterpriseTicTacToe.Application.Tests.Support;
 using Shouldly;
@@ -9,35 +9,41 @@ namespace Pixelbadger.EnterpriseTicTacToe.Application.Tests.Features.Games;
 public sealed class GetGameStateQueryHandlerTests
 {
     [TestMethod]
-    public async Task Handle_WhenSessionDoesNotExist_ThrowsNotFound()
+    public async Task Handle_WhenSessionDoesNotExist_ReturnsNotFoundFailure()
     {
         var handler = CreateHandler(new InMemoryGameSessionRepository());
 
-        await Should.ThrowAsync<NotFoundException>(() =>
-            handler.Handle(new GetGameStateQuery("ABC123", "cookie-1"), CancellationToken.None).AsTask());
+        var result = await handler.Handle(new GetGameStateQuery("ABC123", "cookie-1"), CancellationToken.None);
+
+        result.IsFailure.ShouldBeTrue();
+        result.ErrorType.ShouldBe(ResultErrorType.NotFound);
     }
 
     [TestMethod]
-    public async Task Handle_WhenSessionExpired_ThrowsNotFound()
+    public async Task Handle_WhenSessionExpired_ReturnsNotFoundFailure()
     {
         var now = new DateTime(2026, 2, 12, 10, 0, 0, DateTimeKind.Utc);
         var repository = new InMemoryGameSessionRepository();
         repository.Seed(GameSessionFactory.CreateInProgressSession(utcNow: now.AddHours(-3), inactivityTimeoutHours: 1));
         var handler = CreateHandler(repository, now);
 
-        await Should.ThrowAsync<NotFoundException>(() =>
-            handler.Handle(new GetGameStateQuery("ABC123", "cookie-1"), CancellationToken.None).AsTask());
+        var result = await handler.Handle(new GetGameStateQuery("ABC123", "cookie-1"), CancellationToken.None);
+
+        result.IsFailure.ShouldBeTrue();
+        result.ErrorType.ShouldBe(ResultErrorType.NotFound);
     }
 
     [TestMethod]
-    public async Task Handle_WhenIdentityIsNotPartOfGame_ThrowsForbidden()
+    public async Task Handle_WhenIdentityIsNotPartOfGame_ReturnsForbiddenFailure()
     {
         var repository = new InMemoryGameSessionRepository();
         repository.Seed(GameSessionFactory.CreateInProgressSession());
         var handler = CreateHandler(repository);
 
-        await Should.ThrowAsync<ForbiddenException>(() =>
-            handler.Handle(new GetGameStateQuery("ABC123", "cookie-3"), CancellationToken.None).AsTask());
+        var result = await handler.Handle(new GetGameStateQuery("ABC123", "cookie-3"), CancellationToken.None);
+
+        result.IsFailure.ShouldBeTrue();
+        result.ErrorType.ShouldBe(ResultErrorType.Forbidden);
     }
 
     [TestMethod]
@@ -47,11 +53,12 @@ public sealed class GetGameStateQueryHandlerTests
         repository.Seed(GameSessionFactory.CreateInProgressSession());
         var handler = CreateHandler(repository);
 
-        var state = await handler.Handle(new GetGameStateQuery("ABC123", "cookie-1"), CancellationToken.None);
+        var result = await handler.Handle(new GetGameStateQuery("ABC123", "cookie-1"), CancellationToken.None);
 
-        state.SessionCode.ShouldBe("ABC123");
-        state.PlayerCount.ShouldBe(2);
-        state.Players.Single(player => player.Mark == "X").IsCurrentPlayer.ShouldBeTrue();
+        result.IsSuccess.ShouldBeTrue();
+        result.Value!.SessionCode.ShouldBe("ABC123");
+        result.Value.PlayerCount.ShouldBe(2);
+        result.Value.Players.Single(player => player.Mark == "X").IsCurrentPlayer.ShouldBeTrue();
     }
 
     private static GetGameStateQueryHandler CreateHandler(InMemoryGameSessionRepository repository, DateTime? utcNow = null)

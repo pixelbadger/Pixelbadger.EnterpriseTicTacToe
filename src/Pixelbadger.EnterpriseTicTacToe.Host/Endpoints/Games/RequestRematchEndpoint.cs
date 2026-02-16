@@ -3,6 +3,7 @@ using Mediator;
 using Microsoft.AspNetCore.SignalR;
 using Pixelbadger.EnterpriseTicTacToe.Application.Contracts;
 using Pixelbadger.EnterpriseTicTacToe.Application.Features.Games.RequestRematch;
+using Pixelbadger.EnterpriseTicTacToe.Host.Endpoints.Common;
 using Pixelbadger.EnterpriseTicTacToe.Host.Hubs;
 using Pixelbadger.EnterpriseTicTacToe.Host.Middleware;
 
@@ -10,9 +11,9 @@ namespace Pixelbadger.EnterpriseTicTacToe.Host.Endpoints.Games;
 
 public sealed class RequestRematchEndpoint(
     ISender mediator,
-    IHubContext<GameHub> hubContext) : EndpointWithoutRequest<GameStateDto>
+    IHubContext<GameHub> hubContext) : ResultEndpointWithoutRequest<GameStateDto>
 {
-    public override void Configure()
+    protected override void ConfigureEndpoint()
     {
         Post("/api/games/{sessionCode}/rematch");
         AllowAnonymous();
@@ -22,11 +23,17 @@ public sealed class RequestRematchEndpoint(
     {
         var sessionCode = Route<string>("sessionCode") ?? string.Empty;
         var clientIdentity = HttpContext.GetRequiredClientIdentity();
-        var gameState = await mediator.Send(new RequestRematchCommand(sessionCode, clientIdentity), cancellationToken);
+        var result = await mediator.Send(new RequestRematchCommand(sessionCode, clientIdentity), cancellationToken);
 
-        await hubContext.Clients.Group(gameState.SessionCode)
+        if (!result.IsSuccess)
+        {
+            await SendResultAsync(result, cancellationToken);
+            return;
+        }
+
+        await hubContext.Clients.Group(result.Value!.SessionCode)
             .SendAsync(RealtimeEvents.GameStateChanged, cancellationToken);
 
-        await Send.OkAsync(gameState, cancellationToken);
+        await SendResultAsync(result, cancellationToken);
     }
 }

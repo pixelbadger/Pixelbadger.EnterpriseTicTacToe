@@ -2,13 +2,14 @@ using FastEndpoints;
 using Mediator;
 using Pixelbadger.EnterpriseTicTacToe.Application.Contracts;
 using Pixelbadger.EnterpriseTicTacToe.Application.Features.Games.GetGameState;
+using Pixelbadger.EnterpriseTicTacToe.Host.Endpoints.Common;
 using Pixelbadger.EnterpriseTicTacToe.Host.Middleware;
 
 namespace Pixelbadger.EnterpriseTicTacToe.Host.Endpoints.Games;
 
-public sealed class GetGameStateEndpoint(ISender mediator) : EndpointWithoutRequest<GameStateDto>
+public sealed class GetGameStateEndpoint(ISender mediator) : ResultEndpointWithoutRequest<GameStateDto>
 {
-    public override void Configure()
+    protected override void ConfigureEndpoint()
     {
         Get("/api/games/{sessionCode}");
         AllowAnonymous();
@@ -18,7 +19,7 @@ public sealed class GetGameStateEndpoint(ISender mediator) : EndpointWithoutRequ
     {
         var sessionCode = Route<string>("sessionCode") ?? string.Empty;
         var clientIdentity = HttpContext.GetRequiredClientIdentity();
-        var gameState = await mediator.Send(new GetGameStateQuery(sessionCode, clientIdentity), cancellationToken);
-        await Send.OkAsync(gameState, cancellationToken);
+        var result = await mediator.Send(new GetGameStateQuery(sessionCode, clientIdentity), cancellationToken);
+        await SendResultAsync(result, cancellationToken);
     }
 }

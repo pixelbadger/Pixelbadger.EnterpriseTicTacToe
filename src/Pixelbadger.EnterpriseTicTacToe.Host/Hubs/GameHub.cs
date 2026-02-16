@@ -2,7 +2,6 @@ using Mediator;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.SignalR;
 using Pixelbadger.EnterpriseTicTacToe.Application.Contracts;
-using AppException = Pixelbadger.EnterpriseTicTacToe.Application.Exceptions.ApplicationException;
 using Pixelbadger.EnterpriseTicTacToe.Application.Features.Games.GetGameState;
 using Pixelbadger.EnterpriseTicTacToe.Application.Features.Games.SetPresence;
 using Pixelbadger.EnterpriseTicTacToe.Host.Middleware;
@@ -62,8 +61,13 @@ public sealed class GameHub(
 
         var clientIdentity = httpContext.GetRequiredClientIdentity();
         var normalizedCode = sessionCode.Trim().ToUpperInvariant();
-        var gameState = await mediator.Send(new GetGameStateQuery(normalizedCode, clientIdentity), cancellationToken);
-        await Clients.Caller.SendAsync(RealtimeEvents.GameStateUpdated, gameState, cancellationToken);
+        var gameStateResult = await mediator.Send(new GetGameStateQuery(normalizedCode, clientIdentity), cancellationToken);
+        if (!gameStateResult.IsSuccess)
+        {
+            throw new HubException(gameStateResult.ErrorMessage);
+        }
+
+        await Clients.Caller.SendAsync(RealtimeEvents.GameStateUpdated, gameStateResult.Value, cancellationToken);
     }
 
     private async Task<GameStateDto> SetPresenceWithConcurrencyFallback(
@@ -74,25 +78,32 @@ public sealed class GameHub(
     {
         try
         {
-            return await mediator.Send(new SetPresenceCommand(sessionCode, isOnline, clientIdentity), cancellationToken);
+            var result = await mediator.Send(new SetPresenceCommand(sessionCode, isOnline, clientIdentity), cancellationToken);
+            if (result.IsSuccess)
+            {
+                return result.Value!;
+            }
+
+            logger.LogInformation(
+                "Presence update rejected for session {SessionCode} with error type {ErrorType}",
+                sessionCode,
+                result.ErrorType);
+            throw new HubException(result.ErrorMessage);
         }
         catch (DbUpdateConcurrencyException exception)
         {
             logger.LogDebug(exception, "Presence update conflict for session {SessionCode}", sessionCode);
-            try
+            var refreshResult = await mediator.Send(new GetGameStateQuery(sessionCode, clientIdentity), cancellationToken);
+            if (refreshResult.IsSuccess)
             {
-                return await mediator.Send(new GetGameStateQuery(sessionCode, clientIdentity), cancellationToken);
+                return refreshResult.Value!;
             }
-            catch (AppException appException)
-            {
-                logger.LogInformation(appException, "Presence refresh failed after concurrency conflict for session {SessionCode}", sessionCode);
-                throw new HubException(appException.Message);
-            }
-        }
-        catch (AppException exception)
-        {
-            logger.LogInformation(exception, "Presence update rejected for session {SessionCode}", sessionCode);
-            throw new HubException(exception.Message);
+
+            logger.LogInformation(
+                "Presence refresh failed after concurrency conflict for session {SessionCode} with error type {ErrorType}",
+                sessionCode,
+                refreshResult.ErrorType);
+            throw new HubException(refreshResult.ErrorMessage);
         }
     }
 }

@@ -2,12 +2,11 @@ using FluentValidation;
 using Mediator;
 using Pixelbadger.EnterpriseTicTacToe.Application.Common.Mapping;
 using Pixelbadger.EnterpriseTicTacToe.Application.Contracts;
-using Pixelbadger.EnterpriseTicTacToe.Application.Exceptions;
 using Pixelbadger.EnterpriseTicTacToe.Domain.Services;
 
 namespace Pixelbadger.EnterpriseTicTacToe.Application.Features.Games.GetGameState;
 
-public sealed record GetGameStateQuery(string SessionCode, string ClientIdentity) : IQuery<GameStateDto>;
+public sealed record GetGameStateQuery(string SessionCode, string ClientIdentity) : IQuery<Result<GameStateDto>>;
 
 public sealed class GetGameStateQueryValidator : AbstractValidator<GetGameStateQuery>
 {
@@ -27,26 +26,29 @@ public sealed class GetGameStateQueryHandler(
     IGameSessionRepository gameSessionRepository,
     IClientIdentityHasher clientIdentityHasher,
     IClock clock)
-    : IQueryHandler<GetGameStateQuery, GameStateDto>
+    : IQueryHandler<GetGameStateQuery, Result<GameStateDto>>
 {
-    public async ValueTask<GameStateDto> Handle(GetGameStateQuery query, CancellationToken cancellationToken)
+    public async ValueTask<Result<GameStateDto>> Handle(GetGameStateQuery query, CancellationToken cancellationToken)
     {
         var normalizedCode = GameStateMapper.NormalizeCode(query.SessionCode);
-        var session = await gameSessionRepository.GetByCode(normalizedCode, cancellationToken)
-            ?? throw new NotFoundException("Game session was not found.");
+        var session = await gameSessionRepository.GetByCode(normalizedCode, cancellationToken);
+        if (session is null)
+        {
+            return Result.Failure<GameStateDto>(ResultErrorType.NotFound, "Game session was not found.");
+        }
 
         var now = clock.UtcNow;
         if (session.IsExpired(now))
         {
-            throw new NotFoundException("Game session has expired.");
+            return Result.Failure<GameStateDto>(ResultErrorType.NotFound, "Game session has expired.");
         }
 
         var identityHash = clientIdentityHasher.Hash(query.ClientIdentity);
         if (session.FindPlayerByIdentity(identityHash) is null)
         {
-            throw new ForbiddenException("Anonymous identity is not part of this game.");
+            return Result.Failure<GameStateDto>(ResultErrorType.Forbidden, "Anonymous identity is not part of this game.");
         }
 
-        return GameStateMapper.ToDto(session, identityHash);
+        return Result.Success(GameStateMapper.ToDto(session, identityHash));
     }
 }

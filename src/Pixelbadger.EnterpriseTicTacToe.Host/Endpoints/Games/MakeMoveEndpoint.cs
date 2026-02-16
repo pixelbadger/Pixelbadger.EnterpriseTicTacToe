@@ -3,6 +3,7 @@ using Mediator;
 using Microsoft.AspNetCore.SignalR;
 using Pixelbadger.EnterpriseTicTacToe.Application.Contracts;
 using Pixelbadger.EnterpriseTicTacToe.Application.Features.Games.MakeMove;
+using Pixelbadger.EnterpriseTicTacToe.Host.Endpoints.Common;
 using Pixelbadger.EnterpriseTicTacToe.Host.Hubs;
 using Pixelbadger.EnterpriseTicTacToe.Host.Middleware;
 
@@ -15,9 +16,9 @@ public sealed class MakeMoveRequest
 
 public sealed class MakeMoveEndpoint(
     ISender mediator,
-    IHubContext<GameHub> hubContext) : Endpoint<MakeMoveRequest, GameStateDto>
+    IHubContext<GameHub> hubContext) : ResultEndpoint<MakeMoveRequest, GameStateDto>
 {
-    public override void Configure()
+    protected override void ConfigureEndpoint()
     {
         Post("/api/games/{sessionCode}/moves");
         AllowAnonymous();
@@ -27,11 +28,17 @@ public sealed class MakeMoveEndpoint(
     {
         var sessionCode = Route<string>("sessionCode") ?? string.Empty;
         var clientIdentity = HttpContext.GetRequiredClientIdentity();
-        var gameState = await mediator.Send(new MakeMoveCommand(sessionCode, request.CellIndex, clientIdentity), cancellationToken);
+        var result = await mediator.Send(new MakeMoveCommand(sessionCode, request.CellIndex, clientIdentity), cancellationToken);
 
-        await hubContext.Clients.Group(gameState.SessionCode)
+        if (!result.IsSuccess)
+        {
+            await SendResultAsync(result, cancellationToken);
+            return;
+        }
+
+        await hubContext.Clients.Group(result.Value!.SessionCode)
             .SendAsync(RealtimeEvents.GameStateChanged, cancellationToken);
 
-        await Send.OkAsync(gameState, cancellationToken);
+        await SendResultAsync(result, cancellationToken);
     }
 }

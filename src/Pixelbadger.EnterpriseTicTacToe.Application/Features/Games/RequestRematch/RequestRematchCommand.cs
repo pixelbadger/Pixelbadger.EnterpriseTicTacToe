@@ -3,14 +3,13 @@ using Mediator;
 using Microsoft.Extensions.Options;
 using Pixelbadger.EnterpriseTicTacToe.Application.Common.Mapping;
 using Pixelbadger.EnterpriseTicTacToe.Application.Contracts;
-using Pixelbadger.EnterpriseTicTacToe.Application.Exceptions;
 using Pixelbadger.EnterpriseTicTacToe.Domain.Configuration;
 using Pixelbadger.EnterpriseTicTacToe.Domain.Exceptions;
 using Pixelbadger.EnterpriseTicTacToe.Domain.Services;
 
 namespace Pixelbadger.EnterpriseTicTacToe.Application.Features.Games.RequestRematch;
 
-public sealed record RequestRematchCommand(string SessionCode, string ClientIdentity) : ICommand<GameStateDto>;
+public sealed record RequestRematchCommand(string SessionCode, string ClientIdentity) : ICommand<Result<GameStateDto>>;
 
 public sealed class RequestRematchCommandValidator : AbstractValidator<RequestRematchCommand>
 {
@@ -32,20 +31,23 @@ public sealed class RequestRematchCommandHandler(
     IClientIdentityHasher clientIdentityHasher,
     IClock clock,
     IOptions<GameSessionSettings> settings)
-    : ICommandHandler<RequestRematchCommand, GameStateDto>
+    : ICommandHandler<RequestRematchCommand, Result<GameStateDto>>
 {
-    public async ValueTask<GameStateDto> Handle(RequestRematchCommand command, CancellationToken cancellationToken)
+    public async ValueTask<Result<GameStateDto>> Handle(RequestRematchCommand command, CancellationToken cancellationToken)
     {
         var normalizedCode = GameStateMapper.NormalizeCode(command.SessionCode);
-        var session = await gameSessionRepository.GetByCode(normalizedCode, cancellationToken)
-            ?? throw new NotFoundException("Game session was not found.");
+        var session = await gameSessionRepository.GetByCode(normalizedCode, cancellationToken);
+        if (session is null)
+        {
+            return Result.Failure<GameStateDto>(ResultErrorType.NotFound, "Game session was not found.");
+        }
 
         var now = clock.UtcNow;
         if (session.IsExpired(now))
         {
             session.MarkExpired(now);
             await unitOfWork.SaveChangesAsync(cancellationToken);
-            throw new NotFoundException("Game session has expired.");
+            return Result.Failure<GameStateDto>(ResultErrorType.NotFound, "Game session has expired.");
         }
 
         var identityHash = clientIdentityHasher.Hash(command.ClientIdentity);
@@ -58,10 +60,10 @@ public sealed class RequestRematchCommandHandler(
         }
         catch (DomainRuleViolationException exception)
         {
-            throw new ConflictException(exception.Message);
+            return Result.Failure<GameStateDto>(ResultErrorType.Conflict, exception.Message);
         }
 
         await unitOfWork.SaveChangesAsync(cancellationToken);
-        return GameStateMapper.ToDto(session, identityHash);
+        return Result.Success(GameStateMapper.ToDto(session, identityHash));
     }
 }
