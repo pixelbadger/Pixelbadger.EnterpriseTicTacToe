@@ -1,5 +1,5 @@
 using Microsoft.Extensions.Options;
-using Pixelbadger.EnterpriseTicTacToe.Application.Exceptions;
+using Pixelbadger.EnterpriseTicTacToe.Application;
 using Pixelbadger.EnterpriseTicTacToe.Application.Features.Games.StartGame;
 using Pixelbadger.EnterpriseTicTacToe.Application.Tests.Support;
 using Pixelbadger.EnterpriseTicTacToe.Domain.Configuration;
@@ -25,9 +25,10 @@ public sealed class StartGameCommandHandlerTests
 
         var result = await handler.Handle(new StartGameCommand(" Host ", "cookie-1"), CancellationToken.None);
 
-        result.SessionCode.ShouldBe("ABC123");
-        result.PlayerCount.ShouldBe(1);
-        result.Players.Single().Username.ShouldBe("Host");
+        result.IsSuccess.ShouldBeTrue();
+        result.Value!.SessionCode.ShouldBe("ABC123");
+        result.Value.PlayerCount.ShouldBe(1);
+        result.Value.Players.Single().Username.ShouldBe("Host");
         unitOfWork.SaveChangesCallCount.ShouldBe(1);
         repository.Sessions.Count.ShouldBe(1);
     }
@@ -48,13 +49,14 @@ public sealed class StartGameCommandHandlerTests
 
         var result = await handler.Handle(new StartGameCommand("Host", "cookie-1"), CancellationToken.None);
 
-        result.SessionCode.ShouldBe("XYZ789");
+        result.IsSuccess.ShouldBeTrue();
+        result.Value!.SessionCode.ShouldBe("XYZ789");
         repository.Sessions.Count.ShouldBe(2);
         unitOfWork.SaveChangesCallCount.ShouldBe(1);
     }
 
     [TestMethod]
-    public async Task Handle_WhenCodeAllocationExceedsRetries_ThrowsConflict()
+    public async Task Handle_WhenCodeAllocationExceedsRetries_ReturnsConflictFailure()
     {
         var now = new DateTime(2026, 2, 12, 0, 0, 0, DateTimeKind.Utc);
         var repository = new InMemoryGameSessionRepository();
@@ -67,9 +69,10 @@ public sealed class StartGameCommandHandlerTests
             now,
             inactivityTimeoutHours: 24);
 
-        await Should.ThrowAsync<ConflictException>(() =>
-            handler.Handle(new StartGameCommand("Host", "cookie-1"), CancellationToken.None).AsTask());
+        var result = await handler.Handle(new StartGameCommand("Host", "cookie-1"), CancellationToken.None);
 
+        result.IsFailure.ShouldBeTrue();
+        result.ErrorType.ShouldBe(ResultErrorType.Conflict);
         unitOfWork.SaveChangesCallCount.ShouldBe(0);
         repository.Sessions.Count.ShouldBe(1);
     }
@@ -87,8 +90,9 @@ public sealed class StartGameCommandHandlerTests
             now,
             inactivityTimeoutHours: 0);
 
-        await handler.Handle(new StartGameCommand("Host", "cookie-1"), CancellationToken.None);
+        var result = await handler.Handle(new StartGameCommand("Host", "cookie-1"), CancellationToken.None);
 
+        result.IsSuccess.ShouldBeTrue();
         repository.Sessions["ABC123"].ExpiresAtUtc.ShouldBe(now.AddHours(1));
     }
 

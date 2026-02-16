@@ -1,6 +1,7 @@
 using FluentValidation;
 using Mediator;
 using Microsoft.Extensions.DependencyInjection;
+using Pixelbadger.EnterpriseTicTacToe.Application;
 using Shouldly;
 
 namespace Pixelbadger.EnterpriseTicTacToe.Application.Tests.Common;
@@ -20,16 +21,17 @@ public sealed class ValidationBehaviorTests
             (_, _) =>
             {
                 nextCallCount++;
-                return new ValueTask<string>("ok");
+                return new ValueTask<Result<string>>(Result.Success("ok"));
             },
             CancellationToken.None);
 
-        result.ShouldBe("ok");
+        result.IsSuccess.ShouldBeTrue();
+        result.Value.ShouldBe("ok");
         nextCallCount.ShouldBe(1);
     }
 
     [TestMethod]
-    public async Task Handle_WhenValidatorFails_ThrowsValidationException()
+    public async Task Handle_WhenValidatorFails_ReturnsInvalidResultWithoutCallingNext()
     {
         var provider = new ServiceCollection()
             .AddSingleton<IValidator<TestCommand>, TestCommandValidator>()
@@ -37,16 +39,18 @@ public sealed class ValidationBehaviorTests
         var sut = new ValidationBehavior<TestCommand, string>(provider);
         var nextCallCount = 0;
 
-        await Should.ThrowAsync<FluentValidation.ValidationException>(() =>
-            sut.Handle(
-                new TestCommand(string.Empty),
-                (_, _) =>
-                {
-                    nextCallCount++;
-                    return new ValueTask<string>("ok");
-                },
-                CancellationToken.None).AsTask());
+        var result = await sut.Handle(
+            new TestCommand(string.Empty),
+            (_, _) =>
+            {
+                nextCallCount++;
+                return new ValueTask<Result<string>>(Result.Success("ok"));
+            },
+            CancellationToken.None);
 
+        result.IsFailure.ShouldBeTrue();
+        result.ErrorType.ShouldBe(ResultErrorType.Invalid);
+        result.ErrorMessage.ShouldContain("Value");
         nextCallCount.ShouldBe(0);
     }
 
@@ -64,15 +68,16 @@ public sealed class ValidationBehaviorTests
             (_, _) =>
             {
                 nextCallCount++;
-                return new ValueTask<string>("done");
+                return new ValueTask<Result<string>>(Result.Success("done"));
             },
             CancellationToken.None);
 
-        result.ShouldBe("done");
+        result.IsSuccess.ShouldBeTrue();
+        result.Value.ShouldBe("done");
         nextCallCount.ShouldBe(1);
     }
 
-    private sealed record TestCommand(string Value) : ICommand<string>;
+    private sealed record TestCommand(string Value) : ICommand<Result<string>>;
 
     private sealed class TestCommandValidator : AbstractValidator<TestCommand>
     {
