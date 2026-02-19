@@ -1,6 +1,7 @@
 using FastEndpoints;
 using Mediator;
 using Microsoft.AspNetCore.SignalR;
+using Pixelbadger.EnterpriseTicTacToe.Application;
 using Pixelbadger.EnterpriseTicTacToe.Application.Contracts;
 using Pixelbadger.EnterpriseTicTacToe.Application.Features.Games.JoinGame;
 using Pixelbadger.EnterpriseTicTacToe.Host.Hubs;
@@ -17,24 +18,28 @@ public sealed class JoinGameRequest
 
 public sealed class JoinGameEndpoint(
     ISender mediator,
-    IHubContext<GameHub> hubContext) : Endpoint<JoinGameRequest, GameStateDto>
+    IHubContext<GameHub> hubContext) : Endpoint<JoinGameRequest, Result<GameStateDto>>
 {
     public override void Configure()
     {
-        Post("/api/games/join");
+        Post("/join");
+        Group<ResultGroup>();
         AllowAnonymous();
     }
 
-    public override async Task HandleAsync(JoinGameRequest request, CancellationToken cancellationToken)
+    public override async Task<Result<GameStateDto>> ExecuteAsync(JoinGameRequest request, CancellationToken cancellationToken)
     {
         var clientIdentity = HttpContext.GetRequiredClientIdentity();
-        var gameState = await mediator.Send(
+        var result = await mediator.Send(
             new JoinGameCommand(request.SessionCode, request.Username, clientIdentity),
             cancellationToken);
 
-        await hubContext.Clients.Group(gameState.SessionCode)
-            .SendAsync(RealtimeEvents.GameStateChanged, cancellationToken);
+        if (result.IsSuccess)
+        {
+            await hubContext.Clients.Group(result.Value.SessionCode)
+                .SendAsync(RealtimeEvents.GameStateChanged, cancellationToken);
+        }
 
-        await Send.OkAsync(gameState, cancellationToken);
+        return result;
     }
 }

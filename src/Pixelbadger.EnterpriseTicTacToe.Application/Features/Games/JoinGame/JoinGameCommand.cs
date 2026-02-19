@@ -3,14 +3,13 @@ using Mediator;
 using Microsoft.Extensions.Options;
 using Pixelbadger.EnterpriseTicTacToe.Application.Common.Mapping;
 using Pixelbadger.EnterpriseTicTacToe.Application.Contracts;
-using Pixelbadger.EnterpriseTicTacToe.Application.Exceptions;
 using Pixelbadger.EnterpriseTicTacToe.Domain.Configuration;
 using Pixelbadger.EnterpriseTicTacToe.Domain.Exceptions;
 using Pixelbadger.EnterpriseTicTacToe.Domain.Services;
 
 namespace Pixelbadger.EnterpriseTicTacToe.Application.Features.Games.JoinGame;
 
-public sealed record JoinGameCommand(string SessionCode, string Username, string ClientIdentity) : ICommand<GameStateDto>;
+public sealed record JoinGameCommand(string SessionCode, string Username, string ClientIdentity) : ICommand<Result<GameStateDto>>;
 
 public sealed class JoinGameCommandValidator : AbstractValidator<JoinGameCommand>
 {
@@ -37,20 +36,23 @@ public sealed class JoinGameCommandHandler(
     IClientIdentityHasher clientIdentityHasher,
     IClock clock,
     IOptions<GameSessionSettings> settings)
-    : ICommandHandler<JoinGameCommand, GameStateDto>
+    : ICommandHandler<JoinGameCommand, Result<GameStateDto>>
 {
-    public async ValueTask<GameStateDto> Handle(JoinGameCommand command, CancellationToken cancellationToken)
+    public async ValueTask<Result<GameStateDto>> Handle(JoinGameCommand command, CancellationToken cancellationToken)
     {
         var normalizedCode = GameStateMapper.NormalizeCode(command.SessionCode);
-        var session = await gameSessionRepository.GetByCode(normalizedCode, cancellationToken)
-            ?? throw new NotFoundException("Game session was not found.");
+        var session = await gameSessionRepository.GetByCode(normalizedCode, cancellationToken);
+        if (session is null)
+        {
+            return Result.Failure<GameStateDto>(ResultErrorType.NotFound, "Game session was not found.");
+        }
 
         var now = clock.UtcNow;
         if (session.IsExpired(now))
         {
             session.MarkExpired(now);
             await unitOfWork.SaveChangesAsync(cancellationToken);
-            throw new NotFoundException("Game session has expired.");
+            return Result.Failure<GameStateDto>(ResultErrorType.NotFound, "Game session has expired.");
         }
 
         var username = command.Username.Trim();
@@ -65,29 +67,29 @@ public sealed class JoinGameCommandHandler(
         {
             if (identityPlayer.NormalizedUsername != normalizedUsername)
             {
-                throw new ForbiddenException("This anonymous identity is already bound to a different username in this game.");
+                return Result.Failure<GameStateDto>(ResultErrorType.Forbidden, "This anonymous identity is already bound to a different username in this game.");
             }
 
             session.SetPresence(identityHash, isOnline: true, now, expiresAt);
             await unitOfWork.SaveChangesAsync(cancellationToken);
-            return GameStateMapper.ToDto(session, identityHash);
+            return Result.Success(GameStateMapper.ToDto(session, identityHash));
         }
 
         if (existingPlayer is not null)
         {
             if (existingPlayer.ClientIdentityHash != identityHash)
             {
-                throw new ForbiddenException("That username is already bound to another anonymous identity.");
+                return Result.Failure<GameStateDto>(ResultErrorType.Forbidden, "That username is already bound to another anonymous identity.");
             }
 
             session.SetPresence(identityHash, isOnline: true, now, expiresAt);
             await unitOfWork.SaveChangesAsync(cancellationToken);
-            return GameStateMapper.ToDto(session, identityHash);
+            return Result.Success(GameStateMapper.ToDto(session, identityHash));
         }
 
         if (session.PlayerCount >= 2)
         {
-            throw new ConflictException("Game is already full.");
+            return Result.Failure<GameStateDto>(ResultErrorType.Conflict, "Game is already full.");
         }
 
         try
@@ -96,10 +98,10 @@ public sealed class JoinGameCommandHandler(
         }
         catch (DomainRuleViolationException exception)
         {
-            throw new ConflictException(exception.Message);
+            return Result.Failure<GameStateDto>(ResultErrorType.Conflict, exception.Message);
         }
 
         await unitOfWork.SaveChangesAsync(cancellationToken);
-        return GameStateMapper.ToDto(session, identityHash);
+        return Result.Success(GameStateMapper.ToDto(session, identityHash));
     }
 }

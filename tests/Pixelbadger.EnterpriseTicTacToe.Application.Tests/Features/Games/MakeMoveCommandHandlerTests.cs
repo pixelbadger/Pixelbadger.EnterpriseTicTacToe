@@ -1,5 +1,4 @@
 using Microsoft.Extensions.Options;
-using Pixelbadger.EnterpriseTicTacToe.Application.Exceptions;
 using Pixelbadger.EnterpriseTicTacToe.Application.Features.Games.MakeMove;
 using Pixelbadger.EnterpriseTicTacToe.Application.Tests.Support;
 using Pixelbadger.EnterpriseTicTacToe.Domain.Configuration;
@@ -12,16 +11,18 @@ namespace Pixelbadger.EnterpriseTicTacToe.Application.Tests.Features.Games;
 public sealed class MakeMoveCommandHandlerTests
 {
     [TestMethod]
-    public async Task Handle_WhenSessionDoesNotExist_ThrowsNotFound()
+    public async Task Handle_WhenSessionDoesNotExist_ReturnsNotFoundFailure()
     {
         var handler = CreateHandler(new InMemoryGameSessionRepository(), new RecordingUnitOfWork());
 
-        await Should.ThrowAsync<NotFoundException>(() =>
-            handler.Handle(new MakeMoveCommand("ABC123", 0, "cookie-1"), CancellationToken.None).AsTask());
+        var result = await handler.Handle(new MakeMoveCommand("ABC123", 0, "cookie-1"), CancellationToken.None);
+
+        result.IsFailure.ShouldBeTrue();
+        result.ErrorType.ShouldBe(ResultErrorType.NotFound);
     }
 
     [TestMethod]
-    public async Task Handle_WhenSessionExpired_MarksExpiredAndThrowsNotFound()
+    public async Task Handle_WhenSessionExpired_MarksExpiredAndReturnsNotFoundFailure()
     {
         var now = new DateTime(2026, 2, 12, 12, 0, 0, DateTimeKind.Utc);
         var repository = new InMemoryGameSessionRepository();
@@ -30,24 +31,26 @@ public sealed class MakeMoveCommandHandlerTests
         var unitOfWork = new RecordingUnitOfWork();
         var handler = CreateHandler(repository, unitOfWork, now);
 
-        await Should.ThrowAsync<NotFoundException>(() =>
-            handler.Handle(new MakeMoveCommand("ABC123", 0, "cookie-1"), CancellationToken.None).AsTask());
+        var result = await handler.Handle(new MakeMoveCommand("ABC123", 0, "cookie-1"), CancellationToken.None);
 
+        result.IsFailure.ShouldBeTrue();
+        result.ErrorType.ShouldBe(ResultErrorType.NotFound);
         expired.Status.ShouldBe(GameStatus.Expired);
         unitOfWork.SaveChangesCallCount.ShouldBe(1);
     }
 
     [TestMethod]
-    public async Task Handle_WhenDomainRuleFails_ThrowsConflict()
+    public async Task Handle_WhenDomainRuleFails_ReturnsConflictFailure()
     {
         var repository = new InMemoryGameSessionRepository();
         repository.Seed(GameSessionFactory.CreateWaitingSession());
         var unitOfWork = new RecordingUnitOfWork();
         var handler = CreateHandler(repository, unitOfWork);
 
-        await Should.ThrowAsync<ConflictException>(() =>
-            handler.Handle(new MakeMoveCommand("ABC123", 0, "cookie-1"), CancellationToken.None).AsTask());
+        var result = await handler.Handle(new MakeMoveCommand("ABC123", 0, "cookie-1"), CancellationToken.None);
 
+        result.IsFailure.ShouldBeTrue();
+        result.ErrorType.ShouldBe(ResultErrorType.Conflict);
         unitOfWork.SaveChangesCallCount.ShouldBe(0);
     }
 
@@ -61,8 +64,9 @@ public sealed class MakeMoveCommandHandlerTests
 
         var result = await handler.Handle(new MakeMoveCommand("ABC123", 0, "cookie-1"), CancellationToken.None);
 
-        result.BoardState.ShouldBe("X........");
-        result.CurrentTurn.ShouldBe("O");
+        result.IsSuccess.ShouldBeTrue();
+        result.Value.BoardState.ShouldBe("X........");
+        result.Value.CurrentTurn.ShouldBe("O");
         unitOfWork.SaveChangesCallCount.ShouldBe(1);
     }
 

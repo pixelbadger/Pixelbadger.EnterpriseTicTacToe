@@ -12,7 +12,7 @@ public sealed class ValidationBehaviorTests
     public async Task Handle_WhenNoValidatorRegistered_CallsNext()
     {
         var provider = new ServiceCollection().BuildServiceProvider();
-        var sut = new ValidationBehavior<TestCommand, string>(provider);
+        var sut = new ValidationBehavior<TestCommand, Result<string>>(provider);
         var nextCallCount = 0;
 
         var result = await sut.Handle(
@@ -20,33 +20,36 @@ public sealed class ValidationBehaviorTests
             (_, _) =>
             {
                 nextCallCount++;
-                return new ValueTask<string>("ok");
+                return new ValueTask<Result<string>>(Result.Success("ok"));
             },
             CancellationToken.None);
 
-        result.ShouldBe("ok");
+        result.IsSuccess.ShouldBeTrue();
+        result.Value.ShouldBe("ok");
         nextCallCount.ShouldBe(1);
     }
 
     [TestMethod]
-    public async Task Handle_WhenValidatorFails_ThrowsValidationException()
+    public async Task Handle_WhenValidatorFails_ReturnsInvalidResult()
     {
         var provider = new ServiceCollection()
             .AddSingleton<IValidator<TestCommand>, TestCommandValidator>()
             .BuildServiceProvider();
-        var sut = new ValidationBehavior<TestCommand, string>(provider);
+        var sut = new ValidationBehavior<TestCommand, Result<string>>(provider);
         var nextCallCount = 0;
 
-        await Should.ThrowAsync<FluentValidation.ValidationException>(() =>
-            sut.Handle(
-                new TestCommand(string.Empty),
-                (_, _) =>
-                {
-                    nextCallCount++;
-                    return new ValueTask<string>("ok");
-                },
-                CancellationToken.None).AsTask());
+        var result = await sut.Handle(
+            new TestCommand(string.Empty),
+            (_, _) =>
+            {
+                nextCallCount++;
+                return new ValueTask<Result<string>>(Result.Success("ok"));
+            },
+            CancellationToken.None);
 
+        result.IsFailure.ShouldBeTrue();
+        result.ErrorType.ShouldBe(ResultErrorType.Invalid);
+        result.ErrorMessage.ShouldContain("Value");
         nextCallCount.ShouldBe(0);
     }
 
@@ -56,7 +59,7 @@ public sealed class ValidationBehaviorTests
         var provider = new ServiceCollection()
             .AddSingleton<IValidator<TestCommand>, TestCommandValidator>()
             .BuildServiceProvider();
-        var sut = new ValidationBehavior<TestCommand, string>(provider);
+        var sut = new ValidationBehavior<TestCommand, Result<string>>(provider);
         var nextCallCount = 0;
 
         var result = await sut.Handle(
@@ -64,15 +67,16 @@ public sealed class ValidationBehaviorTests
             (_, _) =>
             {
                 nextCallCount++;
-                return new ValueTask<string>("done");
+                return new ValueTask<Result<string>>(Result.Success("done"));
             },
             CancellationToken.None);
 
-        result.ShouldBe("done");
+        result.IsSuccess.ShouldBeTrue();
+        result.Value.ShouldBe("done");
         nextCallCount.ShouldBe(1);
     }
 
-    private sealed record TestCommand(string Value) : ICommand<string>;
+    private sealed record TestCommand(string Value) : ICommand<Result<string>>;
 
     private sealed class TestCommandValidator : AbstractValidator<TestCommand>
     {

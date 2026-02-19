@@ -3,13 +3,12 @@ using Mediator;
 using Microsoft.Extensions.Options;
 using Pixelbadger.EnterpriseTicTacToe.Application.Common.Mapping;
 using Pixelbadger.EnterpriseTicTacToe.Application.Contracts;
-using Pixelbadger.EnterpriseTicTacToe.Application.Exceptions;
 using Pixelbadger.EnterpriseTicTacToe.Domain.Configuration;
 using Pixelbadger.EnterpriseTicTacToe.Domain.Services;
 
 namespace Pixelbadger.EnterpriseTicTacToe.Application.Features.Games.StartGame;
 
-public sealed record StartGameCommand(string Username, string ClientIdentity) : ICommand<GameStateDto>;
+public sealed record StartGameCommand(string Username, string ClientIdentity) : ICommand<Result<GameStateDto>>;
 
 public sealed class StartGameCommandValidator : AbstractValidator<StartGameCommand>
 {
@@ -32,9 +31,9 @@ public sealed class StartGameCommandHandler(
     IClientIdentityHasher clientIdentityHasher,
     IClock clock,
     IOptions<GameSessionSettings> settings)
-    : ICommandHandler<StartGameCommand, GameStateDto>
+    : ICommandHandler<StartGameCommand, Result<GameStateDto>>
 {
-    public async ValueTask<GameStateDto> Handle(StartGameCommand command, CancellationToken cancellationToken)
+    public async ValueTask<Result<GameStateDto>> Handle(StartGameCommand command, CancellationToken cancellationToken)
     {
         var now = clock.UtcNow;
         var ttlHours = Math.Max(1, settings.Value.InactivityTimeoutHours);
@@ -49,7 +48,7 @@ public sealed class StartGameCommandHandler(
         {
             if (attempts++ > 20)
             {
-                throw new ConflictException("Unable to allocate a new session code. Please try again.");
+                return Result.Failure<GameStateDto>(ResultErrorType.Conflict, "Unable to allocate a new session code. Please try again.");
             }
 
             code = sessionCodeGenerator.GenerateCode();
@@ -67,6 +66,6 @@ public sealed class StartGameCommandHandler(
         await gameSessionRepository.Add(session, cancellationToken);
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
-        return GameStateMapper.ToDto(session, identityHash);
+        return Result.Success(GameStateMapper.ToDto(session, identityHash));
     }
 }
