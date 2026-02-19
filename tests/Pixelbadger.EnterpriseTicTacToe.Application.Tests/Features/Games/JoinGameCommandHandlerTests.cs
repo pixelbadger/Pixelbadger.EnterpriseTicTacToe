@@ -1,5 +1,4 @@
 using Microsoft.Extensions.Options;
-using Pixelbadger.EnterpriseTicTacToe.Application.Exceptions;
 using Pixelbadger.EnterpriseTicTacToe.Application.Features.Games.JoinGame;
 using Pixelbadger.EnterpriseTicTacToe.Application.Tests.Support;
 using Pixelbadger.EnterpriseTicTacToe.Domain.Configuration;
@@ -12,20 +11,21 @@ namespace Pixelbadger.EnterpriseTicTacToe.Application.Tests.Features.Games;
 public sealed class JoinGameCommandHandlerTests
 {
     [TestMethod]
-    public async Task Handle_WhenSessionDoesNotExist_ThrowsNotFound()
+    public async Task Handle_WhenSessionDoesNotExist_ReturnsNotFoundFailure()
     {
         var repository = new InMemoryGameSessionRepository();
         var unitOfWork = new RecordingUnitOfWork();
         var handler = CreateHandler(repository, unitOfWork);
 
-        await Should.ThrowAsync<NotFoundException>(() =>
-            handler.Handle(new JoinGameCommand("ABC123", "Guest", "cookie-2"), CancellationToken.None).AsTask());
+        var result = await handler.Handle(new JoinGameCommand("ABC123", "Guest", "cookie-2"), CancellationToken.None);
 
+        result.IsFailure.ShouldBeTrue();
+        result.ErrorType.ShouldBe(ResultErrorType.NotFound);
         unitOfWork.SaveChangesCallCount.ShouldBe(0);
     }
 
     [TestMethod]
-    public async Task Handle_WhenSessionExpired_MarksExpiredAndThrowsNotFound()
+    public async Task Handle_WhenSessionExpired_MarksExpiredAndReturnsNotFoundFailure()
     {
         var now = new DateTime(2026, 2, 12, 12, 0, 0, DateTimeKind.Utc);
         var repository = new InMemoryGameSessionRepository();
@@ -34,38 +34,41 @@ public sealed class JoinGameCommandHandlerTests
         var unitOfWork = new RecordingUnitOfWork();
         var handler = CreateHandler(repository, unitOfWork, now);
 
-        await Should.ThrowAsync<NotFoundException>(() =>
-            handler.Handle(new JoinGameCommand("ABC123", "Guest", "cookie-2"), CancellationToken.None).AsTask());
+        var result = await handler.Handle(new JoinGameCommand("ABC123", "Guest", "cookie-2"), CancellationToken.None);
 
+        result.IsFailure.ShouldBeTrue();
+        result.ErrorType.ShouldBe(ResultErrorType.NotFound);
         expired.Status.ShouldBe(GameStatus.Expired);
         unitOfWork.SaveChangesCallCount.ShouldBe(1);
     }
 
     [TestMethod]
-    public async Task Handle_WhenIdentityAlreadyInSessionWithDifferentUsername_ThrowsForbidden()
+    public async Task Handle_WhenIdentityAlreadyInSessionWithDifferentUsername_ReturnsForbiddenFailure()
     {
         var repository = new InMemoryGameSessionRepository();
         repository.Seed(GameSessionFactory.CreateWaitingSession());
         var unitOfWork = new RecordingUnitOfWork();
         var handler = CreateHandler(repository, unitOfWork);
 
-        await Should.ThrowAsync<ForbiddenException>(() =>
-            handler.Handle(new JoinGameCommand("ABC123", "OtherName", "cookie-1"), CancellationToken.None).AsTask());
+        var result = await handler.Handle(new JoinGameCommand("ABC123", "OtherName", "cookie-1"), CancellationToken.None);
 
+        result.IsFailure.ShouldBeTrue();
+        result.ErrorType.ShouldBe(ResultErrorType.Forbidden);
         unitOfWork.SaveChangesCallCount.ShouldBe(0);
     }
 
     [TestMethod]
-    public async Task Handle_WhenUsernameBoundToDifferentIdentity_ThrowsForbidden()
+    public async Task Handle_WhenUsernameBoundToDifferentIdentity_ReturnsForbiddenFailure()
     {
         var repository = new InMemoryGameSessionRepository();
         repository.Seed(GameSessionFactory.CreateWaitingSession());
         var unitOfWork = new RecordingUnitOfWork();
         var handler = CreateHandler(repository, unitOfWork);
 
-        await Should.ThrowAsync<ForbiddenException>(() =>
-            handler.Handle(new JoinGameCommand("ABC123", "Host", "cookie-2"), CancellationToken.None).AsTask());
+        var result = await handler.Handle(new JoinGameCommand("ABC123", "Host", "cookie-2"), CancellationToken.None);
 
+        result.IsFailure.ShouldBeTrue();
+        result.ErrorType.ShouldBe(ResultErrorType.Forbidden);
         unitOfWork.SaveChangesCallCount.ShouldBe(0);
     }
 
@@ -82,8 +85,9 @@ public sealed class JoinGameCommandHandlerTests
 
         var result = await handler.Handle(new JoinGameCommand(" abc123 ", "Host", "cookie-1"), CancellationToken.None);
 
-        result.PlayerCount.ShouldBe(1);
-        result.Players.Single().IsOnline.ShouldBeTrue();
+        result.IsSuccess.ShouldBeTrue();
+        result.Value.PlayerCount.ShouldBe(1);
+        result.Value.Players.Single().IsOnline.ShouldBeTrue();
         unitOfWork.SaveChangesCallCount.ShouldBe(1);
     }
 
@@ -97,23 +101,25 @@ public sealed class JoinGameCommandHandlerTests
 
         var result = await handler.Handle(new JoinGameCommand("ABC123", "Guest", "cookie-2"), CancellationToken.None);
 
-        result.PlayerCount.ShouldBe(2);
-        result.Status.ShouldBe("InProgress");
-        result.Players.Any(player => player.Username == "Guest" && player.Mark == "O").ShouldBeTrue();
+        result.IsSuccess.ShouldBeTrue();
+        result.Value.PlayerCount.ShouldBe(2);
+        result.Value.Status.ShouldBe("InProgress");
+        result.Value.Players.Any(player => player.Username == "Guest" && player.Mark == "O").ShouldBeTrue();
         unitOfWork.SaveChangesCallCount.ShouldBe(1);
     }
 
     [TestMethod]
-    public async Task Handle_WhenGameAlreadyFull_ThrowsConflict()
+    public async Task Handle_WhenGameAlreadyFull_ReturnsConflictFailure()
     {
         var repository = new InMemoryGameSessionRepository();
         repository.Seed(GameSessionFactory.CreateInProgressSession());
         var unitOfWork = new RecordingUnitOfWork();
         var handler = CreateHandler(repository, unitOfWork);
 
-        await Should.ThrowAsync<ConflictException>(() =>
-            handler.Handle(new JoinGameCommand("ABC123", "Third", "cookie-3"), CancellationToken.None).AsTask());
+        var result = await handler.Handle(new JoinGameCommand("ABC123", "Third", "cookie-3"), CancellationToken.None);
 
+        result.IsFailure.ShouldBeTrue();
+        result.ErrorType.ShouldBe(ResultErrorType.Conflict);
         unitOfWork.SaveChangesCallCount.ShouldBe(0);
     }
 

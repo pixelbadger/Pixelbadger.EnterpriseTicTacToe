@@ -1,5 +1,4 @@
 using Microsoft.Extensions.Options;
-using Pixelbadger.EnterpriseTicTacToe.Application.Exceptions;
 using Pixelbadger.EnterpriseTicTacToe.Application.Features.Games.SetPresence;
 using Pixelbadger.EnterpriseTicTacToe.Application.Tests.Support;
 using Pixelbadger.EnterpriseTicTacToe.Domain.Configuration;
@@ -12,16 +11,18 @@ namespace Pixelbadger.EnterpriseTicTacToe.Application.Tests.Features.Games;
 public sealed class SetPresenceCommandHandlerTests
 {
     [TestMethod]
-    public async Task Handle_WhenSessionDoesNotExist_ThrowsNotFound()
+    public async Task Handle_WhenSessionDoesNotExist_ReturnsNotFoundFailure()
     {
         var handler = CreateHandler(new InMemoryGameSessionRepository(), new RecordingUnitOfWork());
 
-        await Should.ThrowAsync<NotFoundException>(() =>
-            handler.Handle(new SetPresenceCommand("ABC123", true, "cookie-1"), CancellationToken.None).AsTask());
+        var result = await handler.Handle(new SetPresenceCommand("ABC123", true, "cookie-1"), CancellationToken.None);
+
+        result.IsFailure.ShouldBeTrue();
+        result.ErrorType.ShouldBe(ResultErrorType.NotFound);
     }
 
     [TestMethod]
-    public async Task Handle_WhenSessionExpired_MarksExpiredAndThrowsNotFound()
+    public async Task Handle_WhenSessionExpired_MarksExpiredAndReturnsNotFoundFailure()
     {
         var now = new DateTime(2026, 2, 12, 12, 0, 0, DateTimeKind.Utc);
         var repository = new InMemoryGameSessionRepository();
@@ -30,24 +31,26 @@ public sealed class SetPresenceCommandHandlerTests
         var unitOfWork = new RecordingUnitOfWork();
         var handler = CreateHandler(repository, unitOfWork, now);
 
-        await Should.ThrowAsync<NotFoundException>(() =>
-            handler.Handle(new SetPresenceCommand("ABC123", true, "cookie-1"), CancellationToken.None).AsTask());
+        var result = await handler.Handle(new SetPresenceCommand("ABC123", true, "cookie-1"), CancellationToken.None);
 
+        result.IsFailure.ShouldBeTrue();
+        result.ErrorType.ShouldBe(ResultErrorType.NotFound);
         expired.Status.ShouldBe(GameStatus.Expired);
         unitOfWork.SaveChangesCallCount.ShouldBe(1);
     }
 
     [TestMethod]
-    public async Task Handle_WhenIdentityIsNotPartOfSession_ThrowsForbidden()
+    public async Task Handle_WhenIdentityIsNotPartOfSession_ReturnsForbiddenFailure()
     {
         var repository = new InMemoryGameSessionRepository();
         repository.Seed(GameSessionFactory.CreateInProgressSession());
         var unitOfWork = new RecordingUnitOfWork();
         var handler = CreateHandler(repository, unitOfWork);
 
-        await Should.ThrowAsync<ForbiddenException>(() =>
-            handler.Handle(new SetPresenceCommand("ABC123", true, "cookie-3"), CancellationToken.None).AsTask());
+        var result = await handler.Handle(new SetPresenceCommand("ABC123", true, "cookie-3"), CancellationToken.None);
 
+        result.IsFailure.ShouldBeTrue();
+        result.ErrorType.ShouldBe(ResultErrorType.Forbidden);
         unitOfWork.SaveChangesCallCount.ShouldBe(0);
     }
 
@@ -62,7 +65,8 @@ public sealed class SetPresenceCommandHandlerTests
 
         var result = await handler.Handle(new SetPresenceCommand("ABC123", false, "cookie-2"), CancellationToken.None);
 
-        result.Players.Single(player => player.Mark == "O").IsOnline.ShouldBeFalse();
+        result.IsSuccess.ShouldBeTrue();
+        result.Value.Players.Single(player => player.Mark == "O").IsOnline.ShouldBeFalse();
         unitOfWork.SaveChangesCallCount.ShouldBe(1);
     }
 
