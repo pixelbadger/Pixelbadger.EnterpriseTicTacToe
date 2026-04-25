@@ -8,6 +8,21 @@ var builder = DistributedApplication.CreateBuilder(args);
 var clientIdentityHashKey = builder.AddParameter("client-identity-hash-key", secret: true);
 
 var sqlServer = builder.AddAzureSqlServer("sql")
+    .ClearDefaultRoleAssignments()
+    .ConfigureInfrastructure(infra =>
+    {
+        var resources = infra.GetProvisionableResources();
+
+        foreach (var server in resources.OfType<SqlServer>())
+        {
+            server.PublicNetworkAccess = ServerNetworkAccessFlag.Disabled;
+        }
+
+        foreach (var firewallRule in resources.OfType<SqlFirewallRule>().ToArray())
+        {
+            infra.Remove(firewallRule);
+        }
+    })
     .RunAsContainer();
 var ticTacToeDb = sqlServer.AddDatabase("tictactoedb", "tictactoe")
     .WithDefaultAzureSku();
@@ -54,6 +69,7 @@ if (builder.ExecutionContext.IsPublishMode)
 
     api.PublishAsAzureAppServiceWebsite((_, website) =>
     {
+        website.IsHttpsOnly = true;
         website.SiteConfig.NumberOfWorkers = 1;
 
         var tokenCredentialsSetting = website.SiteConfig.AppSettings

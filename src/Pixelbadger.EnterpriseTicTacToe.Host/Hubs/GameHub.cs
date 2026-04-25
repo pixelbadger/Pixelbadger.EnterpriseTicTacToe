@@ -23,10 +23,11 @@ public sealed class GameHub(
         var clientIdentity = httpContext.GetRequiredClientIdentity();
         var normalizedCode = sessionCode.Trim().ToUpperInvariant();
 
+        var gameState = await SetPresenceWithConcurrencyFallback(normalizedCode, true, clientIdentity, cancellationToken);
+
         await Groups.AddToGroupAsync(Context.ConnectionId, normalizedCode, cancellationToken);
         connectionRegistry.Track(Context.ConnectionId, normalizedCode);
 
-        var gameState = await SetPresenceWithConcurrencyFallback(normalizedCode, true, clientIdentity, cancellationToken);
         await Clients.Caller.SendAsync(RealtimeEvents.GameStateUpdated, gameState, cancellationToken);
         await Clients.OthersInGroup(normalizedCode).SendAsync(RealtimeEvents.GameStateChanged, cancellationToken);
     }

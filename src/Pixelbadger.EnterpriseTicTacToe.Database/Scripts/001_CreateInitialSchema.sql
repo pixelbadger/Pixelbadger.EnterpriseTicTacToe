@@ -9,7 +9,7 @@ BEGIN
     CREATE TABLE [dbo].[GameSessions]
     (
         [Id] UNIQUEIDENTIFIER NOT NULL,
-        [SessionCode] NVARCHAR(6) NOT NULL,
+        [SessionCode] NVARCHAR(8) NOT NULL,
         [Status] NVARCHAR(32) NOT NULL,
         [BoardState] NCHAR(9) NOT NULL,
         [CurrentTurn] NVARCHAR(1) NULL,

@@ -62,19 +62,19 @@ describe("LobbyPage", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: "Join Game" }));
 
-    expect(await screen.findByText("Session code must be 6 letters/numbers")).toBeInTheDocument();
+    expect(await screen.findByText("Session code must be 8 letters/numbers")).toBeInTheDocument();
     expect(joinTrigger).not.toHaveBeenCalled();
   });
 
   it("prefills join code from /join route param", () => {
-    renderLobby("/join/a1b2c3");
+    renderLobby("/join/a1b2c3d4");
 
-    expect(screen.getByLabelText("Session Code")).toHaveValue("a1b2c3");
+    expect(screen.getByLabelText("Session Code")).toHaveValue("a1b2c3d4");
   });
 
   it("starts a game, trims username, and navigates to game route", async () => {
     startTrigger.mockReturnValue({
-      unwrap: vi.fn().mockResolvedValue({ sessionCode: "ZXCVBN" }),
+      unwrap: vi.fn().mockResolvedValue({ sessionCode: "ZXCVBN12" }),
     });
 
     renderLobby();
@@ -88,18 +88,18 @@ describe("LobbyPage", () => {
       expect(startTrigger).toHaveBeenCalledWith({ username: "Alice" });
     });
 
-    expect(await screen.findByText("Game route ZXCVBN")).toBeInTheDocument();
+    expect(await screen.findByText("Game route ZXCVBN12")).toBeInTheDocument();
   });
 
   it("joins a game, normalizes payload, and navigates to game route", async () => {
     joinTrigger.mockReturnValue({
-      unwrap: vi.fn().mockResolvedValue({ sessionCode: "QW12ER" }),
+      unwrap: vi.fn().mockResolvedValue({ sessionCode: "QW12ER34" }),
     });
 
     renderLobby();
 
     fireEvent.change(screen.getByLabelText("Session Code"), {
-      target: { value: "qw12er" },
+      target: { value: "qw12er34" },
     });
     fireEvent.change(screen.getByLabelText("Username", { selector: "#join-username" }), {
       target: { value: "  Bob  " },
@@ -107,10 +107,10 @@ describe("LobbyPage", () => {
     fireEvent.click(screen.getByRole("button", { name: "Join Game" }));
 
     await waitFor(() => {
-      expect(joinTrigger).toHaveBeenCalledWith({ sessionCode: "QW12ER", username: "Bob" });
+      expect(joinTrigger).toHaveBeenCalledWith({ sessionCode: "QW12ER34", username: "Bob" });
     });
 
-    expect(await screen.findByText("Game route QW12ER")).toBeInTheDocument();
+    expect(await screen.findByText("Game route QW12ER34")).toBeInTheDocument();
   });
 
   it("shows loading states for start and join buttons", () => {

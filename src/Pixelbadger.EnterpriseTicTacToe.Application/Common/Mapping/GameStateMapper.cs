@@ -36,7 +36,7 @@ internal static class GameStateMapper
 
     public static bool IsValidCode(string sessionCode)
     {
-        return sessionCode.Length == 6 && sessionCode.All(char.IsAsciiLetterOrDigit);
+        return sessionCode.Length == GameSession.SessionCodeLength && sessionCode.All(char.IsAsciiLetterOrDigit);
     }
 
     public static string NormalizeCode(string sessionCode)

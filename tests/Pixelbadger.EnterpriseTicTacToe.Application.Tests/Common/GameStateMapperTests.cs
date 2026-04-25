@@ -30,12 +30,12 @@ public sealed class GameStateMapperTests
     }
 
     [TestMethod]
-    public void IsValidCode_RequiresSixAsciiAlphanumericCharacters()
+    public void IsValidCode_RequiresConfiguredLengthAsciiAlphanumericCharacters()
     {
-        GameStateMapper.IsValidCode("ABC123").ShouldBeTrue();
-        GameStateMapper.IsValidCode("abc123").ShouldBeTrue();
-        GameStateMapper.IsValidCode("ABCDE").ShouldBeFalse();
-        GameStateMapper.IsValidCode("ABC12!").ShouldBeFalse();
+        GameStateMapper.IsValidCode("ABC12345").ShouldBeTrue();
+        GameStateMapper.IsValidCode("abc12345").ShouldBeTrue();
+        GameStateMapper.IsValidCode("ABC123").ShouldBeFalse();
+        GameStateMapper.IsValidCode("ABC1234!").ShouldBeFalse();
     }
 
     [TestMethod]

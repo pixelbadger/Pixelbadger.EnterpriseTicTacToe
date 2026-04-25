@@ -12,10 +12,26 @@ namespace Pixelbadger.EnterpriseTicTacToe.Infrastructure;
 
 public static class DependencyInjection
 {
-    public static IServiceCollection AddInfrastructureServices(this IServiceCollection services, IConfiguration configuration)
+    private const int MinimumClientIdentityHashKeyLength = 32;
+    private const string DevelopmentHashKey = "development-only-please-change-me";
+
+    private static readonly string[] ProductionPlaceholderHashKeys =
+    [
+        "replace-me-with-env-configured-key",
+        "CHANGE_ME_USE_ENVIRONMENT_SECRET"
+    ];
+
+    public static IServiceCollection AddInfrastructureServices(
+        this IServiceCollection services,
+        IConfiguration configuration,
+        bool allowDevelopmentHashKey = false)
     {
         services.Configure<GameSessionSettings>(configuration.GetSection(GameSessionSettings.SectionName));
-        services.Configure<ClientIdentityOptions>(configuration.GetSection(ClientIdentityOptions.SectionName));
+        services.AddOptions<ClientIdentityOptions>()
+            .Bind(configuration.GetSection(ClientIdentityOptions.SectionName))
+            .Validate(options => IsValidClientIdentityHashKey(options.HashKey, allowDevelopmentHashKey),
+                $"{ClientIdentityOptions.SectionName}:HashKey must be a non-placeholder value at least {MinimumClientIdentityHashKeyLength} characters long.")
+            .ValidateOnStart();
 
         services.AddDbContext<TicTacToeDbContext>(options =>
         {
@@ -36,5 +52,20 @@ public static class DependencyInjection
         services.AddHostedService<InactiveSessionCleanupService>();
 
         return services;
+    }
+
+    private static bool IsValidClientIdentityHashKey(string hashKey, bool allowDevelopmentHashKey)
+    {
+        if (string.IsNullOrWhiteSpace(hashKey) || hashKey.Length < MinimumClientIdentityHashKeyLength)
+        {
+            return false;
+        }
+
+        if (ProductionPlaceholderHashKeys.Contains(hashKey, StringComparer.Ordinal))
+        {
+            return false;
+        }
+
+        return allowDevelopmentHashKey || !string.Equals(hashKey, DevelopmentHashKey, StringComparison.Ordinal);
     }
 }

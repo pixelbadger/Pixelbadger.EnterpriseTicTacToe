@@ -21,7 +21,7 @@ const joinSchema = z.object({
   sessionCode: z
     .string()
     .trim()
-    .regex(/^[A-Za-z0-9]{6}$/, "Session code must be 6 letters/numbers"),
+    .regex(/^[A-Za-z0-9]{8}$/, "Session code must be 8 letters/numbers"),
   username: usernameSchema,
 });
 
@@ -55,7 +55,7 @@ export function LobbyPage() {
           <CardHeader>
             <CardTitle>Start a New Session</CardTitle>
             <CardDescription>
-              Create a private game with a 6-character code and share the link with your opponent.
+              Create a private game with an 8-character code and share the link with your opponent.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -100,7 +100,7 @@ export function LobbyPage() {
               <label className="block text-sm font-medium text-slate-200" htmlFor="join-code">
                 Session Code
               </label>
-              <Input id="join-code" maxLength={6} {...joinForm.register("sessionCode")} />
+              <Input id="join-code" maxLength={8} {...joinForm.register("sessionCode")} />
               {joinCodeError ? <p className="text-sm text-rose-300">{joinCodeError}</p> : null}
 
               <label className="block text-sm font-medium text-slate-200" htmlFor="join-username">

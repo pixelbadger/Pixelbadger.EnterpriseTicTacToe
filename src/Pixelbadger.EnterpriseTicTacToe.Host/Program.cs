@@ -8,11 +8,12 @@ using Pixelbadger.EnterpriseTicTacToe.Infrastructure;
 using Pixelbadger.EnterpriseTicTacToe.Host.Hubs;
 using Pixelbadger.EnterpriseTicTacToe.Host.Middleware;
 using Microsoft.AspNetCore.Mvc;
+using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddApplicationServices();
-builder.Services.AddInfrastructureServices(builder.Configuration);
+builder.Services.AddInfrastructureServices(builder.Configuration, builder.Environment.IsDevelopment());
 builder.Services.AddMediator(options =>
 {
     options.Assemblies = [typeof(Pixelbadger.EnterpriseTicTacToe.Application.DependencyInjection).Assembly];
@@ -32,6 +33,28 @@ builder.Services.AddSignalR(options =>
     options.EnableDetailedErrors = builder.Environment.IsDevelopment();
 });
 builder.Services.AddSingleton<GameConnectionRegistry>();
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(httpContext =>
+    {
+        var path = httpContext.Request.Path;
+        if (!path.StartsWithSegments("/api/games") && !path.StartsWithSegments("/hubs/game"))
+        {
+            return RateLimitPartition.GetNoLimiter("unlimited");
+        }
+
+        var partitionKey = httpContext.Connection.RemoteIpAddress?.ToString() ?? "anonymous";
+
+        return RateLimitPartition.GetFixedWindowLimiter(partitionKey, _ => new FixedWindowRateLimiterOptions
+        {
+            AutoReplenishment = true,
+            PermitLimit = 60,
+            QueueLimit = 0,
+            Window = TimeSpan.FromMinutes(1)
+        });
+    });
+});
 builder.Services.AddHealthChecks()
     .AddCheck<Pixelbadger.EnterpriseTicTacToe.Host.SqlServerHealthCheck>("sqlserver");
 
@@ -85,6 +108,7 @@ if (!app.Environment.IsDevelopment())
     app.UseHttpsRedirection();
 }
 app.UseMiddleware<ClientIdentityCookieMiddleware>();
+app.UseRateLimiter();
 app.UseFastEndpoints();
 app.MapHub<GameHub>("/hubs/game");
 app.MapHealthChecks("/health");

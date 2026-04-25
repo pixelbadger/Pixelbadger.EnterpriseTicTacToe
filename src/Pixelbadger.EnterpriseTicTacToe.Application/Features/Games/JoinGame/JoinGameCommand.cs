@@ -5,6 +5,7 @@ using Pixelbadger.EnterpriseTicTacToe.Application.Common.Mapping;
 using Pixelbadger.EnterpriseTicTacToe.Application.Contracts;
 using Pixelbadger.EnterpriseTicTacToe.Application.Exceptions;
 using Pixelbadger.EnterpriseTicTacToe.Domain.Configuration;
+using Pixelbadger.EnterpriseTicTacToe.Domain.Entities;
 using Pixelbadger.EnterpriseTicTacToe.Domain.Exceptions;
 using Pixelbadger.EnterpriseTicTacToe.Domain.Services;
 
@@ -18,7 +19,7 @@ public sealed class JoinGameCommandValidator : AbstractValidator<JoinGameCommand
     {
         RuleFor(request => request.SessionCode)
             .NotEmpty()
-            .Length(6)
+            .Length(GameSession.SessionCodeLength)
             .Must(GameStateMapper.IsValidCode);
 
         RuleFor(request => request.Username)
