@@ -74,6 +74,9 @@ public sealed class MakeMoveCommandHandlerTests
         return new MakeMoveCommandHandler(
             repository,
             unitOfWork,
+            new RecordingGameSessionCache(),
+            new NoOpGameSessionLock(),
+            new RecordingGamePresenceTracker(),
             new PrefixClientIdentityHasher(),
             new AdjustableClock(utcNow ?? new DateTime(2026, 2, 12, 0, 0, 0, DateTimeKind.Utc)),
             Options.Create(new GameSessionSettings { InactivityTimeoutHours = 24 }));

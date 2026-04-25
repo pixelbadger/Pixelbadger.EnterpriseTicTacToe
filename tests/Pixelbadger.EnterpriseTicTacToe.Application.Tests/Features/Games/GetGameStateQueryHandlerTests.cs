@@ -58,6 +58,9 @@ public sealed class GetGameStateQueryHandlerTests
     {
         return new GetGameStateQueryHandler(
             repository,
+            new RecordingGameSessionCache(),
+            new NoOpGameSessionLock(),
+            new RecordingGamePresenceTracker(),
             new PrefixClientIdentityHasher(),
             new AdjustableClock(utcNow ?? new DateTime(2026, 2, 12, 0, 0, 0, DateTimeKind.Utc)));
     }

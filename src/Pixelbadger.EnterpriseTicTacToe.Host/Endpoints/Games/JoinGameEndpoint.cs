@@ -1,6 +1,5 @@
 using FastEndpoints;
 using Mediator;
-using Microsoft.AspNetCore.SignalR;
 using Pixelbadger.EnterpriseTicTacToe.Application.Contracts;
 using Pixelbadger.EnterpriseTicTacToe.Application.Features.Games.JoinGame;
 using Pixelbadger.EnterpriseTicTacToe.Host.Hubs;
@@ -17,7 +16,7 @@ public sealed class JoinGameRequest
 
 public sealed class JoinGameEndpoint(
     ISender mediator,
-    IHubContext<GameHub> hubContext) : Endpoint<JoinGameRequest, GameStateDto>
+    GameRealtimeNotifier realtimeNotifier) : Endpoint<JoinGameRequest, GameStateDto>
 {
     public override void Configure()
     {
@@ -32,8 +31,7 @@ public sealed class JoinGameEndpoint(
             new JoinGameCommand(request.SessionCode, request.Username, clientIdentity),
             cancellationToken);
 
-        await hubContext.Clients.Group(gameState.SessionCode)
-            .SendAsync(RealtimeEvents.GameStateChanged, cancellationToken);
+        await realtimeNotifier.BroadcastState(gameState.SessionCode, cancellationToken);
 
         await Send.OkAsync(gameState, cancellationToken);
     }

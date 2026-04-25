@@ -4,20 +4,43 @@ namespace Pixelbadger.EnterpriseTicTacToe.Host.Hubs;
 
 public sealed class GameConnectionRegistry
 {
-    private readonly ConcurrentDictionary<string, string> _connections = new();
+    private readonly ConcurrentDictionary<string, GameConnection> _connections = new(StringComparer.Ordinal);
 
-    public void Track(string connectionId, string sessionCode)
+    public void Track(string connectionId, string sessionCode, string clientIdentity)
     {
-        _connections[connectionId] = sessionCode;
+        _connections[connectionId] = new GameConnection(connectionId, sessionCode, clientIdentity);
     }
 
     public bool TryGetSessionCode(string connectionId, out string sessionCode)
     {
-        return _connections.TryGetValue(connectionId, out sessionCode!);
+        if (_connections.TryGetValue(connectionId, out var connection))
+        {
+            sessionCode = connection.SessionCode;
+            return true;
+        }
+
+        sessionCode = string.Empty;
+        return false;
     }
 
-    public bool TryRemove(string connectionId, out string sessionCode)
+    public IReadOnlyList<GameConnection> GetConnections(string sessionCode)
     {
-        return _connections.TryRemove(connectionId, out sessionCode!);
+        return _connections.Values
+            .Where(connection => string.Equals(connection.SessionCode, sessionCode, StringComparison.Ordinal))
+            .ToArray();
+    }
+
+    public bool HasActiveIdentity(string sessionCode, string clientIdentity)
+    {
+        return _connections.Values.Any(connection =>
+            string.Equals(connection.SessionCode, sessionCode, StringComparison.Ordinal) &&
+            string.Equals(connection.ClientIdentity, clientIdentity, StringComparison.Ordinal));
+    }
+
+    public bool TryRemove(string connectionId, out GameConnection connection)
+    {
+        return _connections.TryRemove(connectionId, out connection!);
     }
 }
+
+public sealed record GameConnection(string ConnectionId, string SessionCode, string ClientIdentity);

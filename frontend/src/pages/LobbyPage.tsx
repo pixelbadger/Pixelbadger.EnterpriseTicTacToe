@@ -63,7 +63,7 @@ export function LobbyPage() {
               className="space-y-4"
               onSubmit={startForm.handleSubmit(async (values) => {
                 const gameState = await startGame({ username: values.username }).unwrap();
-                navigate(`/game/${gameState.sessionCode}`);
+                navigate(`/game/${gameState.sessionCode}`, { state: { gameState } });
               })}
             >
               <label className="block text-sm font-medium text-slate-200" htmlFor="start-username">
@@ -94,7 +94,7 @@ export function LobbyPage() {
                   sessionCode: values.sessionCode.toUpperCase(),
                   username: values.username,
                 }).unwrap();
-                navigate(`/game/${gameState.sessionCode}`);
+                navigate(`/game/${gameState.sessionCode}`, { state: { gameState } });
               })}
             >
               <label className="block text-sm font-medium text-slate-200" htmlFor="join-code">

@@ -1,6 +1,5 @@
 using FastEndpoints;
 using Mediator;
-using Microsoft.AspNetCore.SignalR;
 using Pixelbadger.EnterpriseTicTacToe.Application.Contracts;
 using Pixelbadger.EnterpriseTicTacToe.Application.Features.Games.RequestRematch;
 using Pixelbadger.EnterpriseTicTacToe.Host.Hubs;
@@ -10,7 +9,7 @@ namespace Pixelbadger.EnterpriseTicTacToe.Host.Endpoints.Games;
 
 public sealed class RequestRematchEndpoint(
     ISender mediator,
-    IHubContext<GameHub> hubContext) : EndpointWithoutRequest<GameStateDto>
+    GameRealtimeNotifier realtimeNotifier) : EndpointWithoutRequest<GameStateDto>
 {
     public override void Configure()
     {
@@ -24,8 +23,7 @@ public sealed class RequestRematchEndpoint(
         var clientIdentity = HttpContext.GetRequiredClientIdentity();
         var gameState = await mediator.Send(new RequestRematchCommand(sessionCode, clientIdentity), cancellationToken);
 
-        await hubContext.Clients.Group(gameState.SessionCode)
-            .SendAsync(RealtimeEvents.GameStateChanged, cancellationToken);
+        await realtimeNotifier.BroadcastState(gameState.SessionCode, cancellationToken);
 
         await Send.OkAsync(gameState, cancellationToken);
     }

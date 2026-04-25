@@ -44,6 +44,85 @@ internal sealed class RecordingUnitOfWork : IUnitOfWork
     }
 }
 
+internal sealed class RecordingGameSessionCache : IGameSessionCache
+{
+    private readonly Dictionary<string, GameSession> _sessions = new(StringComparer.Ordinal);
+
+    public int SetCallCount { get; private set; }
+
+    public int RemoveCallCount { get; private set; }
+
+    public bool TryGet(string sessionCode, out GameSession session)
+    {
+        return _sessions.TryGetValue(sessionCode, out session!);
+    }
+
+    public void Set(GameSession session)
+    {
+        SetCallCount++;
+        _sessions[session.SessionCode] = session;
+    }
+
+    public void Remove(string sessionCode)
+    {
+        RemoveCallCount++;
+        _sessions.Remove(sessionCode);
+    }
+
+    public void Seed(GameSession session)
+    {
+        _sessions[session.SessionCode] = session;
+    }
+}
+
+internal sealed class NoOpGameSessionLock : IGameSessionLock
+{
+    public ValueTask<IAsyncDisposable> AcquireAsync(string sessionCode, CancellationToken cancellationToken)
+    {
+        return ValueTask.FromResult<IAsyncDisposable>(NoOpLease.Instance);
+    }
+
+    private sealed class NoOpLease : IAsyncDisposable
+    {
+        public static readonly NoOpLease Instance = new();
+
+        public ValueTask DisposeAsync()
+        {
+            return ValueTask.CompletedTask;
+        }
+    }
+}
+
+internal sealed class RecordingGamePresenceTracker : IGamePresenceTracker
+{
+    private readonly HashSet<string> _onlinePlayers = new(StringComparer.Ordinal);
+
+    public int SetPresenceCallCount { get; private set; }
+
+    public void SetPresence(string sessionCode, string clientIdentityHash, bool isOnline)
+    {
+        SetPresenceCallCount++;
+        var key = CreateKey(sessionCode, clientIdentityHash);
+        if (isOnline)
+        {
+            _onlinePlayers.Add(key);
+            return;
+        }
+
+        _onlinePlayers.Remove(key);
+    }
+
+    public bool IsOnline(string sessionCode, string clientIdentityHash)
+    {
+        return _onlinePlayers.Contains(CreateKey(sessionCode, clientIdentityHash));
+    }
+
+    private static string CreateKey(string sessionCode, string clientIdentityHash)
+    {
+        return $"{sessionCode}:{clientIdentityHash}";
+    }
+}
+
 internal sealed class AdjustableClock(DateTime utcNow) : IClock
 {
     public DateTime UtcNow { get; set; } = utcNow;

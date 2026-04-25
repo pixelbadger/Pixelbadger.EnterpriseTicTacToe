@@ -12,6 +12,7 @@ namespace Pixelbadger.EnterpriseTicTacToe.Host.Hubs;
 public sealed class GameHub(
     ISender mediator,
     GameConnectionRegistry connectionRegistry,
+    GameRealtimeNotifier realtimeNotifier,
     ILogger<GameHub> logger) : Hub
 {
     public async Task JoinSession(string sessionCode)
@@ -23,32 +24,33 @@ public sealed class GameHub(
         var clientIdentity = httpContext.GetRequiredClientIdentity();
         var normalizedCode = sessionCode.Trim().ToUpperInvariant();
 
-        var gameState = await SetPresenceWithConcurrencyFallback(normalizedCode, true, clientIdentity, cancellationToken);
-
         await Groups.AddToGroupAsync(Context.ConnectionId, normalizedCode, cancellationToken);
-        connectionRegistry.Track(Context.ConnectionId, normalizedCode);
+        connectionRegistry.Track(Context.ConnectionId, normalizedCode, clientIdentity);
 
-        await Clients.Caller.SendAsync(RealtimeEvents.GameStateUpdated, gameState, cancellationToken);
-        await Clients.OthersInGroup(normalizedCode).SendAsync(RealtimeEvents.GameStateChanged, cancellationToken);
+        await SetPresenceWithConcurrencyFallback(normalizedCode, true, clientIdentity, cancellationToken);
+        await realtimeNotifier.BroadcastState(normalizedCode, cancellationToken);
     }
 
     public override async Task OnDisconnectedAsync(Exception? exception)
     {
-        if (connectionRegistry.TryRemove(Context.ConnectionId, out var sessionCode))
+        if (connectionRegistry.TryRemove(Context.ConnectionId, out var connection))
         {
             try
             {
-                var httpContext = Context.GetHttpContext();
-                if (httpContext is not null)
+                if (!connectionRegistry.HasActiveIdentity(connection.SessionCode, connection.ClientIdentity))
                 {
-                    var clientIdentity = httpContext.GetRequiredClientIdentity();
-                    await SetPresenceWithConcurrencyFallback(sessionCode, false, clientIdentity, CancellationToken.None);
-                    await Clients.Group(sessionCode).SendAsync(RealtimeEvents.GameStateChanged, CancellationToken.None);
+                    await SetPresenceWithConcurrencyFallback(
+                        connection.SessionCode,
+                        false,
+                        connection.ClientIdentity,
+                        CancellationToken.None);
                 }
+
+                await realtimeNotifier.BroadcastState(connection.SessionCode, CancellationToken.None);
             }
             catch (Exception ex)
             {
-                logger.LogDebug(ex, "Unable to set player presence offline for session {SessionCode}", sessionCode);
+                logger.LogDebug(ex, "Unable to set player presence offline for session {SessionCode}", connection.SessionCode);
             }
         }
 

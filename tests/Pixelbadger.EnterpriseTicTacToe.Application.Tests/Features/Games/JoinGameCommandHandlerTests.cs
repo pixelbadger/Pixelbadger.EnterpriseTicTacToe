@@ -70,7 +70,7 @@ public sealed class JoinGameCommandHandlerTests
     }
 
     [TestMethod]
-    public async Task Handle_WhenIdentityRejoinsKnownSeat_UpdatesPresenceAndReturnsState()
+    public async Task Handle_WhenIdentityRejoinsKnownSeat_ReturnsStateWithoutDurablePresenceWrite()
     {
         var now = new DateTime(2026, 2, 12, 0, 2, 0, DateTimeKind.Utc);
         var repository = new InMemoryGameSessionRepository();
@@ -83,8 +83,8 @@ public sealed class JoinGameCommandHandlerTests
         var result = await handler.Handle(new JoinGameCommand(" abc123 ", "Host", "cookie-1"), CancellationToken.None);
 
         result.PlayerCount.ShouldBe(1);
-        result.Players.Single().IsOnline.ShouldBeTrue();
-        unitOfWork.SaveChangesCallCount.ShouldBe(1);
+        result.Players.Single().IsOnline.ShouldBeFalse();
+        unitOfWork.SaveChangesCallCount.ShouldBe(0);
     }
 
     [TestMethod]
@@ -125,6 +125,9 @@ public sealed class JoinGameCommandHandlerTests
         return new JoinGameCommandHandler(
             repository,
             unitOfWork,
+            new RecordingGameSessionCache(),
+            new NoOpGameSessionLock(),
+            new RecordingGamePresenceTracker(),
             new PrefixClientIdentityHasher(),
             new AdjustableClock(utcNow ?? new DateTime(2026, 2, 12, 0, 0, 0, DateTimeKind.Utc)),
             Options.Create(new GameSessionSettings { InactivityTimeoutHours = 24 }));

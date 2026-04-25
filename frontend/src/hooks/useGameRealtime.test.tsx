@@ -22,12 +22,14 @@ const signalR = vi.hoisted(() => {
   };
 
   const withUrl = vi.fn(() => builder);
+  const withHubProtocol = vi.fn(() => builder);
   const withAutomaticReconnect = vi.fn(() => builder);
   const configureLogging = vi.fn(() => builder);
   const build = vi.fn(() => connection);
 
   const builder = {
     withUrl,
+    withHubProtocol,
     withAutomaticReconnect,
     configureLogging,
     build,
@@ -42,6 +44,7 @@ const signalR = vi.hoisted(() => {
     start,
     stop,
     withUrl,
+    withHubProtocol,
     withAutomaticReconnect,
     configureLogging,
     build,
@@ -51,9 +54,16 @@ const signalR = vi.hoisted(() => {
 
 vi.mock("@microsoft/signalr", () => ({
   HubConnectionBuilder: signalR.HubConnectionBuilder,
+  HttpTransportType: {
+    WebSockets: 1,
+  },
   LogLevel: {
     Warning: "warning",
   },
+}));
+
+vi.mock("@microsoft/signalr-protocol-msgpack", () => ({
+  MessagePackHubProtocol: vi.fn(() => ({ name: "messagepack" })),
 }));
 
 function HookHost(props: { sessionCode?: string; onGameState: (state: GameState) => void }) {
@@ -83,6 +93,7 @@ describe("useGameRealtime", () => {
     signalR.start.mockClear();
     signalR.stop.mockClear();
     signalR.withUrl.mockClear();
+    signalR.withHubProtocol.mockClear();
     signalR.withAutomaticReconnect.mockClear();
     signalR.configureLogging.mockClear();
     signalR.build.mockClear();
@@ -106,15 +117,18 @@ describe("useGameRealtime", () => {
       expect(signalR.start).toHaveBeenCalledTimes(1);
     });
 
-    expect(signalR.withUrl).toHaveBeenCalledWith("/hubs/game", { withCredentials: true });
+    expect(signalR.withUrl).toHaveBeenCalledWith("/hubs/game", {
+      withCredentials: true,
+      transport: 1,
+      skipNegotiation: true,
+    });
+    expect(signalR.withHubProtocol).toHaveBeenCalledTimes(1);
     expect(signalR.withAutomaticReconnect).toHaveBeenCalledTimes(1);
     expect(signalR.configureLogging).toHaveBeenCalledWith("warning");
     expect(signalR.on).toHaveBeenCalledWith("GameStateUpdated", expect.any(Function));
-    expect(signalR.on).toHaveBeenCalledWith("GameStateChanged", expect.any(Function));
 
     await waitFor(() => {
       expect(signalR.invoke).toHaveBeenCalledWith("JoinSession", "ABC123");
-      expect(signalR.invoke).toHaveBeenCalledWith("RefreshState", "ABC123");
     });
   });
 
@@ -134,16 +148,50 @@ describe("useGameRealtime", () => {
     expect(second).toHaveBeenCalledWith(gameState);
   });
 
-  it("invokes RefreshState when GameStateChanged fires", async () => {
+  it("normalizes PascalCase MessagePack payloads", () => {
+    const onGameState = vi.fn();
+    render(<HookHost onGameState={onGameState} sessionCode="ABC123" />);
+
+    const updatedHandler = signalR.handlers.get("GameStateUpdated");
+    expect(updatedHandler).toBeTruthy();
+
+    updatedHandler?.({
+      SessionCode: "ABC123",
+      JoinPath: "/join/ABC123",
+      Status: "InProgress",
+      BoardState: ".........",
+      CurrentTurn: "X",
+      Winner: null,
+      RematchXReady: false,
+      RematchOReady: false,
+      PlayerCount: 1,
+      Players: [
+        {
+          Username: "Alice",
+          Mark: "X",
+          IsOnline: true,
+          IsCurrentPlayer: true,
+        },
+      ],
+      LastActivityUtc: new Date("2026-02-14T00:00:00Z"),
+    });
+
+    expect(onGameState).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sessionCode: "ABC123",
+        currentTurn: "X",
+        players: [expect.objectContaining({ username: "Alice", isOnline: true })],
+        lastActivityUtc: "2026-02-14T00:00:00.000Z",
+      }),
+    );
+  });
+
+  it("only joins session after connection starts", async () => {
     render(<HookHost onGameState={vi.fn()} sessionCode="ABC123" />);
 
-    const changedHandler = signalR.handlers.get("GameStateChanged");
-    expect(changedHandler).toBeTruthy();
-
-    changedHandler?.();
-
     await waitFor(() => {
-      expect(signalR.invoke).toHaveBeenCalledWith("RefreshState", "ABC123");
+      expect(signalR.invoke).toHaveBeenCalledTimes(1);
+      expect(signalR.invoke).toHaveBeenCalledWith("JoinSession", "ABC123");
     });
   });
 

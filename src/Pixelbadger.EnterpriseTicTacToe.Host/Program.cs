@@ -1,6 +1,7 @@
 using FastEndpoints;
 using FastEndpoints.Swagger;
 using FluentValidation;
+using Microsoft.AspNetCore.Http.Connections;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Diagnostics;
 using Pixelbadger.EnterpriseTicTacToe.Application;
@@ -31,8 +32,10 @@ builder.Services.SwaggerDocument(document =>
 builder.Services.AddSignalR(options =>
 {
     options.EnableDetailedErrors = builder.Environment.IsDevelopment();
-});
+})
+    .AddMessagePackProtocol();
 builder.Services.AddSingleton<GameConnectionRegistry>();
+builder.Services.AddScoped<GameRealtimeNotifier>();
 builder.Services.AddRateLimiter(options =>
 {
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
@@ -110,7 +113,11 @@ if (!app.Environment.IsDevelopment())
 app.UseMiddleware<ClientIdentityCookieMiddleware>();
 app.UseRateLimiter();
 app.UseFastEndpoints();
-app.MapHub<GameHub>("/hubs/game");
+app.MapHub<GameHub>("/hubs/game", options =>
+{
+    options.Transports = HttpTransportType.WebSockets;
+    options.AllowStatefulReconnects = true;
+});
 app.MapHealthChecks("/health");
 
 if (app.Environment.IsDevelopment())

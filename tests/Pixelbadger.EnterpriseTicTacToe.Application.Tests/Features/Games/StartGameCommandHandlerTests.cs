@@ -102,6 +102,8 @@ public sealed class StartGameCommandHandlerTests
         return new StartGameCommandHandler(
             repository,
             unitOfWork,
+            new RecordingGameSessionCache(),
+            new RecordingGamePresenceTracker(),
             codeGenerator,
             new PrefixClientIdentityHasher(),
             new AdjustableClock(now),
@@ -118,6 +120,8 @@ public sealed class StartGameCommandHandlerTests
         return new StartGameCommandHandler(
             repository,
             unitOfWork,
+            new RecordingGameSessionCache(),
+            new RecordingGamePresenceTracker(),
             codeGenerator,
             new PrefixClientIdentityHasher(),
             new AdjustableClock(now),

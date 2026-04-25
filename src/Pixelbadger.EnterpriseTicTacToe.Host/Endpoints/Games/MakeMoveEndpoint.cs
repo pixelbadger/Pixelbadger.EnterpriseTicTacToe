@@ -1,6 +1,5 @@
 using FastEndpoints;
 using Mediator;
-using Microsoft.AspNetCore.SignalR;
 using Pixelbadger.EnterpriseTicTacToe.Application.Contracts;
 using Pixelbadger.EnterpriseTicTacToe.Application.Features.Games.MakeMove;
 using Pixelbadger.EnterpriseTicTacToe.Host.Hubs;
@@ -15,7 +14,7 @@ public sealed class MakeMoveRequest
 
 public sealed class MakeMoveEndpoint(
     ISender mediator,
-    IHubContext<GameHub> hubContext) : Endpoint<MakeMoveRequest, GameStateDto>
+    GameRealtimeNotifier realtimeNotifier) : Endpoint<MakeMoveRequest, GameStateDto>
 {
     public override void Configure()
     {
@@ -29,8 +28,7 @@ public sealed class MakeMoveEndpoint(
         var clientIdentity = HttpContext.GetRequiredClientIdentity();
         var gameState = await mediator.Send(new MakeMoveCommand(sessionCode, request.CellIndex, clientIdentity), cancellationToken);
 
-        await hubContext.Clients.Group(gameState.SessionCode)
-            .SendAsync(RealtimeEvents.GameStateChanged, cancellationToken);
+        await realtimeNotifier.BroadcastState(gameState.SessionCode, cancellationToken);
 
         await Send.OkAsync(gameState, cancellationToken);
     }
