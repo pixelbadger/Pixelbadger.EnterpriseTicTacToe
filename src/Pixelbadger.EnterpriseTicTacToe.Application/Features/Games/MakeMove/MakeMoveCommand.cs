@@ -5,6 +5,7 @@ using Pixelbadger.EnterpriseTicTacToe.Application.Common.Mapping;
 using Pixelbadger.EnterpriseTicTacToe.Application.Contracts;
 using Pixelbadger.EnterpriseTicTacToe.Application.Exceptions;
 using Pixelbadger.EnterpriseTicTacToe.Domain.Configuration;
+using Pixelbadger.EnterpriseTicTacToe.Domain.Entities;
 using Pixelbadger.EnterpriseTicTacToe.Domain.Exceptions;
 using Pixelbadger.EnterpriseTicTacToe.Domain.Services;
 
@@ -18,7 +19,7 @@ public sealed class MakeMoveCommandValidator : AbstractValidator<MakeMoveCommand
     {
         RuleFor(request => request.SessionCode)
             .NotEmpty()
-            .Length(6)
+            .Length(GameSession.SessionCodeLength)
             .Must(GameStateMapper.IsValidCode);
 
         RuleFor(request => request.CellIndex)
@@ -32,6 +33,9 @@ public sealed class MakeMoveCommandValidator : AbstractValidator<MakeMoveCommand
 public sealed class MakeMoveCommandHandler(
     IGameSessionRepository gameSessionRepository,
     IUnitOfWork unitOfWork,
+    IGameSessionCache gameSessionCache,
+    IGameSessionLock gameSessionLock,
+    IGamePresenceTracker gamePresenceTracker,
     IClientIdentityHasher clientIdentityHasher,
     IClock clock,
     IOptions<GameSessionSettings> settings)
@@ -40,6 +44,8 @@ public sealed class MakeMoveCommandHandler(
     public async ValueTask<GameStateDto> Handle(MakeMoveCommand command, CancellationToken cancellationToken)
     {
         var normalizedCode = GameStateMapper.NormalizeCode(command.SessionCode);
+        await using var sessionLease = await gameSessionLock.AcquireAsync(normalizedCode, cancellationToken);
+
         var session = await gameSessionRepository.GetByCode(normalizedCode, cancellationToken)
             ?? throw new NotFoundException("Game session was not found.");
 
@@ -48,6 +54,7 @@ public sealed class MakeMoveCommandHandler(
         {
             session.MarkExpired(now);
             await unitOfWork.SaveChangesAsync(cancellationToken);
+            gameSessionCache.Remove(normalizedCode);
             throw new NotFoundException("Game session has expired.");
         }
 
@@ -65,6 +72,10 @@ public sealed class MakeMoveCommandHandler(
         }
 
         await unitOfWork.SaveChangesAsync(cancellationToken);
-        return GameStateMapper.ToDto(session, identityHash);
+        gameSessionCache.Set(session);
+        return GameStateMapper.ToDto(
+            session,
+            identityHash,
+            playerIdentityHash => gamePresenceTracker.IsOnline(session.SessionCode, playerIdentityHash));
     }
 }

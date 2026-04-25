@@ -1,8 +1,6 @@
-using Microsoft.Extensions.Options;
 using Pixelbadger.EnterpriseTicTacToe.Application.Exceptions;
 using Pixelbadger.EnterpriseTicTacToe.Application.Features.Games.SetPresence;
 using Pixelbadger.EnterpriseTicTacToe.Application.Tests.Support;
-using Pixelbadger.EnterpriseTicTacToe.Domain.Configuration;
 using Pixelbadger.EnterpriseTicTacToe.Domain.Enums;
 using Shouldly;
 
@@ -14,27 +12,25 @@ public sealed class SetPresenceCommandHandlerTests
     [TestMethod]
     public async Task Handle_WhenSessionDoesNotExist_ThrowsNotFound()
     {
-        var handler = CreateHandler(new InMemoryGameSessionRepository(), new RecordingUnitOfWork());
+        var handler = CreateHandler(new InMemoryGameSessionRepository());
 
         await Should.ThrowAsync<NotFoundException>(() =>
             handler.Handle(new SetPresenceCommand("ABC123", true, "cookie-1"), CancellationToken.None).AsTask());
     }
 
     [TestMethod]
-    public async Task Handle_WhenSessionExpired_MarksExpiredAndThrowsNotFound()
+    public async Task Handle_WhenSessionExpired_ThrowsNotFoundWithoutDurableWrite()
     {
         var now = new DateTime(2026, 2, 12, 12, 0, 0, DateTimeKind.Utc);
         var repository = new InMemoryGameSessionRepository();
         var expired = GameSessionFactory.CreateInProgressSession(utcNow: now.AddHours(-5), inactivityTimeoutHours: 1);
         repository.Seed(expired);
-        var unitOfWork = new RecordingUnitOfWork();
-        var handler = CreateHandler(repository, unitOfWork, now);
+        var handler = CreateHandler(repository, now);
 
         await Should.ThrowAsync<NotFoundException>(() =>
             handler.Handle(new SetPresenceCommand("ABC123", true, "cookie-1"), CancellationToken.None).AsTask());
 
-        expired.Status.ShouldBe(GameStatus.Expired);
-        unitOfWork.SaveChangesCallCount.ShouldBe(1);
+        expired.Status.ShouldBe(GameStatus.InProgress);
     }
 
     [TestMethod]
@@ -42,13 +38,10 @@ public sealed class SetPresenceCommandHandlerTests
     {
         var repository = new InMemoryGameSessionRepository();
         repository.Seed(GameSessionFactory.CreateInProgressSession());
-        var unitOfWork = new RecordingUnitOfWork();
-        var handler = CreateHandler(repository, unitOfWork);
+        var handler = CreateHandler(repository);
 
         await Should.ThrowAsync<ForbiddenException>(() =>
             handler.Handle(new SetPresenceCommand("ABC123", true, "cookie-3"), CancellationToken.None).AsTask());
-
-        unitOfWork.SaveChangesCallCount.ShouldBe(0);
     }
 
     [TestMethod]
@@ -57,25 +50,27 @@ public sealed class SetPresenceCommandHandlerTests
         var repository = new InMemoryGameSessionRepository();
         var session = GameSessionFactory.CreateInProgressSession();
         repository.Seed(session);
-        var unitOfWork = new RecordingUnitOfWork();
-        var handler = CreateHandler(repository, unitOfWork);
+        var presenceTracker = new RecordingGamePresenceTracker();
+        presenceTracker.SetPresence("ABC123", "hash::cookie-2", true);
+        var handler = CreateHandler(repository, presenceTracker: presenceTracker);
 
         var result = await handler.Handle(new SetPresenceCommand("ABC123", false, "cookie-2"), CancellationToken.None);
 
         result.Players.Single(player => player.Mark == "O").IsOnline.ShouldBeFalse();
-        unitOfWork.SaveChangesCallCount.ShouldBe(1);
+        presenceTracker.SetPresenceCallCount.ShouldBe(2);
     }
 
     private static SetPresenceCommandHandler CreateHandler(
         InMemoryGameSessionRepository repository,
-        RecordingUnitOfWork unitOfWork,
-        DateTime? utcNow = null)
+        DateTime? utcNow = null,
+        RecordingGamePresenceTracker? presenceTracker = null)
     {
         return new SetPresenceCommandHandler(
             repository,
-            unitOfWork,
+            new RecordingGameSessionCache(),
+            new NoOpGameSessionLock(),
+            presenceTracker ?? new RecordingGamePresenceTracker(),
             new PrefixClientIdentityHasher(),
-            new AdjustableClock(utcNow ?? new DateTime(2026, 2, 12, 0, 0, 0, DateTimeKind.Utc)),
-            Options.Create(new GameSessionSettings { InactivityTimeoutHours = 24 }));
+            new AdjustableClock(utcNow ?? new DateTime(2026, 2, 12, 0, 0, 0, DateTimeKind.Utc)));
     }
 }

@@ -1,11 +1,9 @@
 using FluentValidation;
 using Mediator;
-using Microsoft.Extensions.Options;
 using Pixelbadger.EnterpriseTicTacToe.Application.Common.Mapping;
 using Pixelbadger.EnterpriseTicTacToe.Application.Contracts;
 using Pixelbadger.EnterpriseTicTacToe.Application.Exceptions;
-using Pixelbadger.EnterpriseTicTacToe.Domain.Configuration;
-using Pixelbadger.EnterpriseTicTacToe.Domain.Exceptions;
+using Pixelbadger.EnterpriseTicTacToe.Domain.Entities;
 using Pixelbadger.EnterpriseTicTacToe.Domain.Services;
 
 namespace Pixelbadger.EnterpriseTicTacToe.Application.Features.Games.SetPresence;
@@ -18,7 +16,7 @@ public sealed class SetPresenceCommandValidator : AbstractValidator<SetPresenceC
     {
         RuleFor(request => request.SessionCode)
             .NotEmpty()
-            .Length(6)
+            .Length(GameSession.SessionCodeLength)
             .Must(GameStateMapper.IsValidCode);
 
         RuleFor(request => request.ClientIdentity)
@@ -28,40 +26,43 @@ public sealed class SetPresenceCommandValidator : AbstractValidator<SetPresenceC
 
 public sealed class SetPresenceCommandHandler(
     IGameSessionRepository gameSessionRepository,
-    IUnitOfWork unitOfWork,
+    IGameSessionCache gameSessionCache,
+    IGameSessionLock gameSessionLock,
+    IGamePresenceTracker gamePresenceTracker,
     IClientIdentityHasher clientIdentityHasher,
-    IClock clock,
-    IOptions<GameSessionSettings> settings)
+    IClock clock)
     : ICommandHandler<SetPresenceCommand, GameStateDto>
 {
     public async ValueTask<GameStateDto> Handle(SetPresenceCommand command, CancellationToken cancellationToken)
     {
         var normalizedCode = GameStateMapper.NormalizeCode(command.SessionCode);
-        var session = await gameSessionRepository.GetByCode(normalizedCode, cancellationToken)
-            ?? throw new NotFoundException("Game session was not found.");
+        await using var sessionLease = await gameSessionLock.AcquireAsync(normalizedCode, cancellationToken);
+
+        if (!gameSessionCache.TryGet(normalizedCode, out var session))
+        {
+            session = await gameSessionRepository.GetByCode(normalizedCode, cancellationToken)
+                ?? throw new NotFoundException("Game session was not found.");
+            gameSessionCache.Set(session);
+        }
 
         var now = clock.UtcNow;
         if (session.IsExpired(now))
         {
-            session.MarkExpired(now);
-            await unitOfWork.SaveChangesAsync(cancellationToken);
+            gameSessionCache.Remove(normalizedCode);
             throw new NotFoundException("Game session has expired.");
         }
 
         var identityHash = clientIdentityHasher.Hash(command.ClientIdentity);
-        var ttlHours = Math.Max(1, settings.Value.InactivityTimeoutHours);
-        var expiresAt = GameStateMapper.CalculateExpiry(now, ttlHours);
-
-        try
+        if (session.FindPlayerByIdentity(identityHash) is null)
         {
-            session.SetPresence(identityHash, command.IsOnline, now, expiresAt);
-        }
-        catch (DomainRuleViolationException exception)
-        {
-            throw new ForbiddenException(exception.Message);
+            throw new ForbiddenException("Player is not part of this game.");
         }
 
-        await unitOfWork.SaveChangesAsync(cancellationToken);
-        return GameStateMapper.ToDto(session, identityHash);
+        gamePresenceTracker.SetPresence(normalizedCode, identityHash, command.IsOnline);
+
+        return GameStateMapper.ToDto(
+            session,
+            identityHash,
+            playerIdentityHash => gamePresenceTracker.IsOnline(session.SessionCode, playerIdentityHash));
     }
 }

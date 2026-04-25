@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useLocation, useParams } from "react-router-dom";
 import { Button } from "../components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { useGameRealtime } from "../hooks/useGameRealtime";
@@ -33,9 +33,13 @@ function prettyStatus(game: GameState) {
 export function GamePage() {
   const { code } = useParams<{ code: string }>();
   const sessionCode = code?.toUpperCase();
-  const [liveGame, setLiveGame] = useState<GameState | null>(null);
+  const location = useLocation();
+  const [liveGame, setLiveGame] = useState<GameState | null>(() => {
+    const routeState = location.state as { gameState?: GameState } | null;
+    return sessionCode != null && routeState?.gameState?.sessionCode === sessionCode ? routeState.gameState : null;
+  });
   const { data: fetchedGame, isLoading, isError, refetch } = useGetGameStateQuery(sessionCode ?? "", {
-    skip: !sessionCode,
+    skip: !sessionCode || liveGame !== null,
   });
   const [makeMove, { isLoading: isMoveLoading }] = useMakeMoveMutation();
   const [requestRematch, { isLoading: isRematchLoading }] = useRequestRematchMutation();

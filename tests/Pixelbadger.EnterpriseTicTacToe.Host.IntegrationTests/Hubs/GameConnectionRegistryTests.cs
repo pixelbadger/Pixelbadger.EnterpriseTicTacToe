@@ -11,7 +11,7 @@ public sealed class GameConnectionRegistryTests
     {
         var registry = new GameConnectionRegistry();
 
-        registry.Track("connection-1", "ABC123");
+        registry.Track("connection-1", "ABC123", "cookie-1");
 
         var found = registry.TryGetSessionCode("connection-1", out var sessionCode);
 
@@ -23,13 +23,25 @@ public sealed class GameConnectionRegistryTests
     public void TryRemove_RemovesConnectionFromRegistry()
     {
         var registry = new GameConnectionRegistry();
-        registry.Track("connection-1", "ABC123");
+        registry.Track("connection-1", "ABC123", "cookie-1");
 
-        var removed = registry.TryRemove("connection-1", out var removedCode);
+        var removed = registry.TryRemove("connection-1", out var removedConnection);
         var stillPresent = registry.TryGetSessionCode("connection-1", out _);
 
         removed.ShouldBeTrue();
-        removedCode.ShouldBe("ABC123");
+        removedConnection.SessionCode.ShouldBe("ABC123");
         stillPresent.ShouldBeFalse();
+    }
+
+    [TestMethod]
+    public void HasActiveIdentity_WhenAnotherConnectionRemains_ReturnsTrue()
+    {
+        var registry = new GameConnectionRegistry();
+        registry.Track("connection-1", "ABC123", "cookie-1");
+        registry.Track("connection-2", "ABC123", "cookie-1");
+
+        registry.TryRemove("connection-1", out _).ShouldBeTrue();
+
+        registry.HasActiveIdentity("ABC123", "cookie-1").ShouldBeTrue();
     }
 }

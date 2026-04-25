@@ -5,6 +5,8 @@ namespace Pixelbadger.EnterpriseTicTacToe.Domain.Entities;
 
 public sealed class GameSession
 {
+    public const int SessionCodeLength = 8;
+
     private static readonly int[][] WinningLines =
     [
         [0, 1, 2],

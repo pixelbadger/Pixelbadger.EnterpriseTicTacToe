@@ -6,7 +6,10 @@ namespace Pixelbadger.EnterpriseTicTacToe.Application.Common.Mapping;
 
 internal static class GameStateMapper
 {
-    public static GameStateDto ToDto(GameSession session, string currentIdentityHash)
+    public static GameStateDto ToDto(
+        GameSession session,
+        string currentIdentityHash,
+        Func<string, bool>? isOnline = null)
     {
         return new GameStateDto(
             SessionCode: session.SessionCode,
@@ -23,7 +26,7 @@ internal static class GameStateMapper
                 .Select(player => new PlayerStateDto(
                     Username: player.Username,
                     Mark: player.Mark.ToString(),
-                    IsOnline: player.IsOnline,
+                    IsOnline: isOnline?.Invoke(player.ClientIdentityHash) ?? player.IsOnline,
                     IsCurrentPlayer: player.ClientIdentityHash == currentIdentityHash))
                 .ToArray(),
             LastActivityUtc: session.LastActivityUtc);
@@ -36,7 +39,7 @@ internal static class GameStateMapper
 
     public static bool IsValidCode(string sessionCode)
     {
-        return sessionCode.Length == 6 && sessionCode.All(char.IsAsciiLetterOrDigit);
+        return sessionCode.Length == GameSession.SessionCodeLength && sessionCode.All(char.IsAsciiLetterOrDigit);
     }
 
     public static string NormalizeCode(string sessionCode)

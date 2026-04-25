@@ -5,6 +5,7 @@ using Pixelbadger.EnterpriseTicTacToe.Application.Common.Mapping;
 using Pixelbadger.EnterpriseTicTacToe.Application.Contracts;
 using Pixelbadger.EnterpriseTicTacToe.Application.Exceptions;
 using Pixelbadger.EnterpriseTicTacToe.Domain.Configuration;
+using Pixelbadger.EnterpriseTicTacToe.Domain.Entities;
 using Pixelbadger.EnterpriseTicTacToe.Domain.Exceptions;
 using Pixelbadger.EnterpriseTicTacToe.Domain.Services;
 
@@ -18,7 +19,7 @@ public sealed class JoinGameCommandValidator : AbstractValidator<JoinGameCommand
     {
         RuleFor(request => request.SessionCode)
             .NotEmpty()
-            .Length(6)
+            .Length(GameSession.SessionCodeLength)
             .Must(GameStateMapper.IsValidCode);
 
         RuleFor(request => request.Username)
@@ -34,6 +35,9 @@ public sealed class JoinGameCommandValidator : AbstractValidator<JoinGameCommand
 public sealed class JoinGameCommandHandler(
     IGameSessionRepository gameSessionRepository,
     IUnitOfWork unitOfWork,
+    IGameSessionCache gameSessionCache,
+    IGameSessionLock gameSessionLock,
+    IGamePresenceTracker gamePresenceTracker,
     IClientIdentityHasher clientIdentityHasher,
     IClock clock,
     IOptions<GameSessionSettings> settings)
@@ -42,6 +46,8 @@ public sealed class JoinGameCommandHandler(
     public async ValueTask<GameStateDto> Handle(JoinGameCommand command, CancellationToken cancellationToken)
     {
         var normalizedCode = GameStateMapper.NormalizeCode(command.SessionCode);
+        await using var sessionLease = await gameSessionLock.AcquireAsync(normalizedCode, cancellationToken);
+
         var session = await gameSessionRepository.GetByCode(normalizedCode, cancellationToken)
             ?? throw new NotFoundException("Game session was not found.");
 
@@ -50,6 +56,7 @@ public sealed class JoinGameCommandHandler(
         {
             session.MarkExpired(now);
             await unitOfWork.SaveChangesAsync(cancellationToken);
+            gameSessionCache.Remove(normalizedCode);
             throw new NotFoundException("Game session has expired.");
         }
 
@@ -68,9 +75,8 @@ public sealed class JoinGameCommandHandler(
                 throw new ForbiddenException("This anonymous identity is already bound to a different username in this game.");
             }
 
-            session.SetPresence(identityHash, isOnline: true, now, expiresAt);
-            await unitOfWork.SaveChangesAsync(cancellationToken);
-            return GameStateMapper.ToDto(session, identityHash);
+            gameSessionCache.Set(session);
+            return ToDto(session, identityHash);
         }
 
         if (existingPlayer is not null)
@@ -80,9 +86,8 @@ public sealed class JoinGameCommandHandler(
                 throw new ForbiddenException("That username is already bound to another anonymous identity.");
             }
 
-            session.SetPresence(identityHash, isOnline: true, now, expiresAt);
-            await unitOfWork.SaveChangesAsync(cancellationToken);
-            return GameStateMapper.ToDto(session, identityHash);
+            gameSessionCache.Set(session);
+            return ToDto(session, identityHash);
         }
 
         if (session.PlayerCount >= 2)
@@ -100,6 +105,15 @@ public sealed class JoinGameCommandHandler(
         }
 
         await unitOfWork.SaveChangesAsync(cancellationToken);
-        return GameStateMapper.ToDto(session, identityHash);
+        gameSessionCache.Set(session);
+        return ToDto(session, identityHash);
+    }
+
+    private GameStateDto ToDto(GameSession session, string identityHash)
+    {
+        return GameStateMapper.ToDto(
+            session,
+            identityHash,
+            playerIdentityHash => gamePresenceTracker.IsOnline(session.SessionCode, playerIdentityHash));
     }
 }
